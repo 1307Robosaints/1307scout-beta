@@ -1,0 +1,1851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>window.RS_BUILD = {"version":"0.0.5+7eca554","channel":"experimental","commit":"7eca554","site":"beta"};</script>
+  <link rel="icon" href="/img/robosaintslogo.png">
+  <!-- 1307scout app (PWA): see /js/pwa.js and /sw.js -->
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#0A2352">
+  <link rel="apple-touch-icon" href="/img/app/apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="1307scout β">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <title>Team Database – 1307scout</title>
+  <!-- Open connections early to the hosts this page needs before it can draw or load data -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="preconnect" href="https://nyanwljgsazwuzmnlrcz.supabase.co" crossorigin>
+  <!-- Light/dark theme, before the stylesheets so a dark page never flashes white -->
+  <script src="/js/theme.js"></script>
+  <link href="/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="/css/modern.css" rel="stylesheet">
+  <style>
+    .q-wrap { max-width: 1200px; margin: 0 auto; }
+
+    .q-layout {
+      display: grid;
+      grid-template-columns: minmax(230px, 300px) minmax(0, 1fr);
+      gap: 1.25rem;
+      align-items: start;
+    }
+    @media (max-width: 991px) { .q-layout { grid-template-columns: 1fr; } }
+
+    .q-panel {
+      min-width: 0;
+      background: var(--white);
+      border: 1px solid var(--line);
+      border-top: 3px solid var(--blue);
+      padding: 1rem;
+    }
+
+    /* Search / sort / filter controls above the team list */
+    .list-controls { margin-bottom: .75rem; }
+    .list-controls .row-2 { display: grid; grid-template-columns: 1fr auto; gap: .4rem; margin-top: .4rem; }
+    .list-controls select.form-control-sm { font-size: .82rem; }
+    #sortDir { padding: .25rem .5rem; }
+
+    /* Team list: one row per team, built as flex/grid rows (not a <table>) so it can
+       reflow to a stacked card layout on narrow screens without horizontal scrolling. */
+    .team-list { border-top: 1px solid var(--line); }
+    .team-row {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      padding: .5rem .35rem;
+      border-bottom: 1px solid var(--line);
+      cursor: pointer;
+      font-size: .9rem;
+    }
+    .team-row:hover { background: var(--tint); }
+    .team-row.selected { background: var(--tint); box-shadow: inset 3px 0 0 var(--blue); }
+    /* Logo tile, then the number with its two grade dots underneath */
+    .team-row .tr-name { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: .6rem; }
+    .team-row .tr-id { display: flex; flex-direction: column; line-height: 1.15; }
+    .team-row .tr-id strong { font-size: .95rem; }
+    .team-row .tr-dots { display: flex; gap: 3px; margin-top: .2rem; }
+    .team-row .tr-dots .tier-dot { margin-right: 0; }
+    /* Every logo sits in the same framed square, so mixed sizes and backgrounds line up */
+    .logo-tile {
+      flex: none; width: 34px; height: 34px; border-radius: 7px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--paper); border: 1px solid var(--line); overflow: hidden;
+      box-shadow: 0 1px 2px rgba(16, 24, 40, .06);
+    }
+    .logo-tile img { width: 26px; height: 26px; object-fit: contain; }
+    .logo-tile.empty { color: var(--muted); font-size: .8rem; background: var(--tint); }
+    .team-row.selected .logo-tile { border-color: var(--blue); }
+    .team-row .tr-stats-line { flex: none; display: flex; gap: .85rem; }
+    .team-row .tr-stat { flex: none; display: flex; flex-direction: column; align-items: center; min-width: 2.2rem; }
+    .team-row .tr-stat .stat-v { font-weight: 600; line-height: 1.1; }
+    .team-row .tr-stat .stat-k { font-size: .62rem; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+    .tier-dot {
+      display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+      margin-right: 3px; vertical-align: middle;
+      flex: none;
+    }
+    .list-scroll { max-height: 70vh; overflow-y: auto; }
+
+    /* Narrow phones: stack the name above the stats, and lay the stats out as
+       "value label" pairs in a row instead of three stacked mini-columns. */
+    @media (max-width: 420px) {
+      .team-row { flex-wrap: wrap; row-gap: .3rem; }
+      .team-row .tr-name { flex-basis: 100%; }
+      .team-row .tr-stats-line { gap: 1rem; }
+      .team-row .tr-stat { flex-direction: row; align-items: baseline; gap: .25rem; min-width: 0; }
+    }
+
+    .detail-card {
+      position: relative;
+      min-width: 0;
+      background: var(--white);
+      border: 1px solid var(--line);
+      border-top: 3px solid var(--blue);
+      padding: 1.5rem;
+      min-height: 320px;
+    }
+    .detail-head { padding-right: 210px; display: flex; gap: .9rem; align-items: center; }
+    .detail-head h2 { margin-bottom: .15rem; }
+    .team-logo {
+      width: 56px; height: 56px; object-fit: contain; flex: none;
+      background: var(--paper); border: 1px solid var(--line);
+    }
+
+    /* Rating boxes, top right of the card — one for scouting, one for official data */
+    .rating-group {
+      position: absolute;
+      top: 1.25rem;
+      right: 1.25rem;
+      display: flex;
+      gap: .5rem;
+    }
+    .rating-wrap {
+      width: 92px;
+      text-align: center;
+    }
+    .rating-box {
+      height: 80px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+    }
+    .rating-letter {
+      font-family: var(--display);
+      font-size: 2.3rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .rating-caption {
+      font-size: .64rem;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      font-weight: 600;
+    }
+    .rating-meta {
+      font-size: .74rem;
+      color: var(--muted);
+      margin-top: .35rem;
+      white-space: nowrap;
+    }
+
+    /* Add to Red / Blue Alliance buttons, under the team name (padded clear of the rating boxes) */
+    .alliance-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-top: 1rem; padding-right: 210px; }
+    .alliance-actions .btn { color: #fff; }
+    .alliance-actions .offline-btn { color: inherit; margin-left: auto; }
+    .alliance-actions .btn-red { background: #c0392b; }
+    .alliance-actions .btn-blue { background: #1B4DB1; }
+    .alliance-actions .btn:hover { filter: brightness(.88); }
+    .alliance-actions a.view-link { font-size: .85rem; }
+
+    .section-title { font-size: 1.05rem; margin: 1.5rem 0 .6rem; }
+
+    /* Trend charts: one series each, in the theme's tokens */
+    .trend-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: .75rem; }
+    .trend-chart { position: relative; margin: 0; border: 1px solid var(--line); background: var(--paper); padding: .4rem .5rem .2rem; }
+    .trend-chart figcaption { font-size: .82rem; font-weight: 600; color: var(--heading); }
+    .trend-chart svg { width: 100%; height: auto; display: block; }
+    .tc-grid { stroke: var(--line); stroke-width: 1; }
+    .tc-avg { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 4; }
+    .tc-line { fill: none; stroke: var(--blue); stroke-width: 2; stroke-linejoin: round; }
+    .tc-dot { fill: var(--blue); stroke: var(--paper); stroke-width: 2; }
+    .tc-hit { fill: transparent; }
+    .tc-pt:hover .tc-dot, .tc-pt:focus .tc-dot { r: 6; }
+    .tc-pt:focus { outline: none; }
+    .tc-axis { fill: var(--muted); font-size: 11px; }
+    .tc-tip { position: absolute; background: var(--navy); color: #fff; font-size: .75rem; padding: .15rem .45rem; pointer-events: none; white-space: nowrap; }
+
+    /* Notes */
+    .notes-search { max-width: 18rem; margin-bottom: .4rem; }
+    .notes-list { list-style: none; padding: 0; margin: 0; max-height: 22rem; overflow-y: auto; font-size: .9rem; }
+    .notes-list li { padding: .3rem 0; border-bottom: 1px solid var(--line); }
+    .notes-list li .text-muted { font-size: .78rem; }
+    .src-badge {
+      font-size: .62rem; text-transform: uppercase; letter-spacing: .04em;
+      font-weight: 700; padding: .15rem .5rem; margin-left: .5rem;
+      border-radius: 3px; vertical-align: middle;
+    }
+    .src-badge.scout { background: var(--tint); color: var(--link); }
+    .src-badge.api   { background: var(--green-bg); color: var(--green); }
+    .src-badge.vision { background: var(--amber-bg); color: var(--amber); }
+
+    .tile-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: .6rem;
+      margin-top: 1rem;
+    }
+    .tile { border: 1px solid var(--line); padding: .6rem .75rem; background: var(--paper); }
+    .tile .v { font-family: var(--display); font-size: 1.3rem; color: var(--heading); font-weight: 700; line-height: 1.2; }
+    .tile .k { font-size: .75rem; color: var(--muted); line-height: 1.3; }
+
+    /* Rating breakdown: one 0-100 bar per part of the scouting rating */
+    .rating-part { display: grid; grid-template-columns: 11rem 1fr 2.5rem; align-items: center; gap: .75rem; font-size: .88rem; padding: .15rem 0; }
+    .rating-part .rp-label { color: var(--muted); }
+    .rating-part .rp-track { height: 10px; background: var(--paper); border: 1px solid var(--line); }
+    .rating-part .rp-fill { display: block; height: 100%; background: var(--blue); }
+    .rating-part .rp-value { font-weight: 600; text-align: right; }
+    .insight-note { color: var(--muted); font-size: .8rem; margin: .5rem 0 0; }
+
+    /* Full stat tables. Collapsible because they can run long, but open by default */
+    details.stat-block > summary { cursor: pointer; }
+    details.stat-block > summary .section-title { display: inline-block; }
+    .match-table td.stat-mix { white-space: normal; min-width: 14rem; }
+    .match-table tr.stat-section td { background: var(--tint); color: var(--heading); font-weight: 600; font-size: .78rem; }
+
+    .info-grid { display: grid; grid-template-columns: 11rem 1fr; gap: .4rem 1rem; font-size: .92rem; margin: 0; }
+    .info-grid dt { color: var(--muted); font-weight: 500; }
+    .info-grid dd { margin: 0; word-break: break-word; }
+
+    /* Flags a frame/weight spec over the FRC limit — see scout_fields.reg_limit. Specs aren't
+       rejected at save time, just flagged everywhere a value shows up (here and on the Scout
+       page's own tables/form). */
+    .reg-flag {
+      display: inline-block; background: var(--red-bg); color: var(--red);
+      font-size: .62rem; text-transform: uppercase; letter-spacing: .03em;
+      font-weight: 700; padding: .05rem .4rem; margin-left: .35rem; vertical-align: middle;
+    }
+
+    .match-table { font-size: .86rem; }
+    .match-table th { background: var(--navy); color: #fff; font-weight: 500; border: 0; white-space: nowrap; }
+    .match-table td { border-top: 1px solid var(--line); white-space: nowrap; }
+    .match-table tbody tr:nth-child(even) { background: var(--paper); }
+
+    .empty-detail { color: var(--muted); text-align: center; padding: 3rem 1rem; }
+    .loading-msg { color: var(--muted); font-family: var(--display); padding: 2rem 0; text-align: center; }
+
+    /* Event rankings: rows open the team, and the link back sits above a team's detail */
+    .rank-table tbody tr[data-team] { cursor: pointer; }
+    .rank-table tbody tr[data-team]:hover, .rank-table tbody tr[data-team]:focus { background: var(--tint); outline: none; }
+    .rank-table td.rank-n { font-family: var(--display); font-weight: 700; color: var(--heading); }
+    .rank-table tr.is-us td { box-shadow: inset 0 -1px 0 var(--blue); font-weight: 600; }
+    .back-to-rank { display: inline-block; font-size: .85rem; margin-bottom: .75rem; }
+
+    /* Mobile: the rating boxes no longer fit floated top-right over the heading, so they drop
+       below the team name/basis text as a normal row instead of an absolutely-positioned one,
+       and the info-grid (pit data) stacks label-over-value instead of a fixed label column. */
+    @media (max-width: 575px) {
+      .detail-card { padding: 1rem; }
+      .detail-head { padding-right: 0; flex-wrap: wrap; }
+      .alliance-actions { padding-right: 0; }
+      .rating-group { position: static; margin: .9rem 0 0; width: 100%; }
+      .rating-wrap { width: 84px; }
+      .rating-box { height: 68px; }
+      .rating-letter { font-size: 1.9rem; }
+      .info-grid { grid-template-columns: 1fr; gap: .1rem .75rem; }
+      .info-grid dt { margin-top: .5rem; }
+      .rating-part { grid-template-columns: 7.5rem 1fr 2.2rem; gap: .5rem; }
+      .tile-grid { grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); }
+      .list-scroll { max-height: 48vh; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ===== Navigation ===== -->
+  <nav class="navbar fixed-top navbar-expand-lg navbar-dark bg-dark" id="navigation">
+    <div class="container">
+      <a class="navbar-brand" href="/index.html">
+        <img src="/img/robosaintslogo.png" data-dark-src="/img/robosaintslogo-dark.png" id="navbarlogo" alt="">
+        St. Thomas Aquinas Robotics Team 1307
+      </a>
+      <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarResponsive"
+              aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <div class="collapse navbar-collapse" id="navbarResponsive">
+        <ul class="navbar-nav ml-auto">
+          <li class="nav-item">
+            <a class="nav-link" href="/index.html">Home</a>
+          </li>
+
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="navSponsors" role="button"
+              data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Sponsors</a>
+            <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navSponsors">
+              <a class="dropdown-item" href="/oursponsors.html">Our Sponsors</a>
+              <a class="dropdown-item" href="/business-plan.html">Business Plan</a>
+            </div>
+          </li>
+
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="navAbout" role="button"
+              data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">About Us</a>
+            <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navAbout">
+              <a class="dropdown-item" href="/about-the-students.html">The Students</a>
+              <a class="dropdown-item" href="/about-the-mentors.html">The Mentors</a>
+              <a class="dropdown-item" href="/about-the-robot.html">The Robots</a>
+              <a class="dropdown-item" href="/results.html">Season Results</a>
+            </div>
+          </li>
+
+          <li class="nav-item">
+            <a class="nav-link" href="/Gallery/gallery.html">Picture Gallery</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/contact.html">Contact Us</a>
+          </li>
+
+          <!-- 1307scout command center. Items marked data-role are shown or hidden by auth.js -->
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="navScout" role="button"
+              data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">1307scout</a>
+            <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navScout">
+              <a class="dropdown-item" href="/1307scout.html">1307scout Home</a>
+              <h6 class="dropdown-header" data-role="team" hidden>Data</h6>
+              <a class="dropdown-item" href="/live.html" data-role="team" hidden>Competition Day</a>
+              <a class="dropdown-item" href="/query.html" data-role="team" hidden>Team Database</a>
+              <a class="dropdown-item" href="/alliance.html" data-role="team" hidden>Alliance View</a>
+              <a class="dropdown-item" href="/scout.html" data-role="team" hidden>Scout</a>
+              <a class="dropdown-item" href="/flags.html" data-role="team" hidden>Match Flags</a>
+              <a class="dropdown-item" href="/playoffs.html" data-role="team" hidden>Playoff Selection</a>
+              <a class="dropdown-item" href="/bracket.html" data-role="team" hidden>Playoff Bracket</a>
+              <a class="dropdown-item" href="/share.html" data-role="team" hidden>Share Data</a>
+              <h6 class="dropdown-header" data-role="team" hidden>My Team</h6>
+              <a class="dropdown-item" href="/matches.html" data-role="team" hidden>Our Matches</a>
+              <a class="dropdown-item" href="/strategy.html" data-role="team" hidden>Match Strategy</a>
+              <a class="dropdown-item" href="/pitcrew.html" data-role="team" hidden>Pit Crew</a>
+              <a class="dropdown-item" href="/picklist.html" data-role="team" hidden>Pick List</a>
+              <a class="dropdown-item" href="/shifts.html" data-role="team" hidden>Scout Shifts</a>
+              <a class="dropdown-item" href="/team.html" data-role="team" hidden>Team Management</a>
+              <div class="dropdown-divider" data-role="staff" hidden></div>
+              <a class="dropdown-item" href="/portal.html" data-role="staff" hidden>Staff Portal</a>
+            </div>
+          </li>
+
+          <li class="nav-item" id="authNavItem">
+            <a class="nav-link" href="/signin.html">Sign In</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container" style="padding-top:2rem;">
+    <div class="q-wrap">
+      <h1 class="mt-4 mb-1">Team Database</h1>
+      <p class="text-muted mb-2" style="font-size:.95rem;">Select a team to see its match history, robot parameters, and rating. <a href="/ratings.html">How ratings work</a></p>
+      <div class="mb-4" id="resyncSlot"></div>
+
+      <div class="q-layout">
+        <!-- Team list -->
+        <div class="q-panel">
+          <div class="list-controls">
+            <select id="eventSel" class="form-control form-control-sm mb-2" aria-label="Event">
+              <option value="">Event: All events</option>
+            </select>
+            <input type="text" id="teamSearch" class="form-control form-control-sm" style="width:100%;" placeholder="Search team # or name" aria-label="Search teams">
+            <div class="row-2">
+              <select id="teamSort" class="form-control form-control-sm" aria-label="Sort by">
+                <option value="team">Sort: Team #</option>
+                <option value="name">Sort: Name</option>
+                <option value="scouted">Sort: Scouted matches</option>
+                <option value="official">Sort: Official matches</option>
+                <option value="scoutGrade">Sort: Scouting grade</option>
+                <option value="offGrade">Sort: Official grade</option>
+                <option value="pit">Sort: Pit data</option>
+              </select>
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="sortDir" title="Reverse sort order" aria-label="Reverse sort order">
+                <i class="fa fa-sort-amount-asc" id="sortDirIcon" aria-hidden="true"></i>
+              </button>
+            </div>
+            <select id="teamFilter" class="form-control form-control-sm mt-2" aria-label="Filter">
+              <option value="all">All teams</option>
+              <option value="rated">Rated teams only (3+ matches)</option>
+              <option value="unrated">Not yet rated</option>
+              <option value="haspit">Has pit data</option>
+              <option value="nopit">Missing pit data</option>
+            </select>
+            <div class="custom-control custom-checkbox mt-2">
+              <input type="checkbox" class="custom-control-input" id="showTestTeams">
+              <label class="custom-control-label" for="showTestTeams" style="font-size:.82rem;">Show test teams</label>
+            </div>
+          </div>
+          <div class="text-muted mb-2" style="font-size:.82rem;" id="teamCount">Loading teams…</div>
+          <div class="list-scroll">
+            <div class="team-list" id="teamRows"></div>
+          </div>
+        </div>
+
+        <!-- Team detail -->
+        <div class="detail-card" id="detail">
+          <div class="empty-detail">Select a team from the list, or pick an event to see its rankings.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="py-5" id="bottomrow">
+    <a href="https://instagram.com/1307robosaints" class="fa fa-instagram" target="_blank" rel="noopener" aria-label="Instagram"></a>
+    <a href="https://www.youtube.com/@1307Robosaints" class="fa fa-youtube" target="_blank" rel="noopener" aria-label="YouTube"></a>
+    <a href="https://www.facebook.com/1307robosaints" class="fa fa-facebook" target="_blank" rel="noopener" aria-label="Facebook"></a>
+    <a href="https://www.tiktok.com/@1307.robotics" class="fa social-tt" target="_blank" rel="noopener" aria-label="TikTok">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path fill="currentColor" d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
+      </svg>
+    </a>
+    <div class="container">
+      <p class="m-0 text-center text-white">Copyright &copy; STA Robotics Team 2026</p>
+      <p class="m-0 mt-2 text-center" style="font-size:.78rem;">
+        Official match data from the
+        <a href="https://frc-events.firstinspires.org/services/API" target="_blank" rel="noopener" style="color:#fff;text-decoration:underline;">FIRST FRC Events API</a>
+        and <a href="https://www.thebluealliance.com" target="_blank" rel="noopener" style="color:#fff;text-decoration:underline;">The Blue Alliance</a>.
+      </p>
+      <p class="m-0 mt-2 text-center" style="font-size:.78rem;">
+        Website and 1307scout service created and maintained by Daniel Lowry —
+        <a href="/contact.html" style="color:#fff;text-decoration:underline;">website support</a>
+      </p>
+      <p class="m-0 mt-2 text-center" style="font-size:.78rem;">
+        <a href="/privacy-policy.html" style="color:#fff;text-decoration:underline;">Privacy Policy</a>
+        &nbsp;&middot;&nbsp;
+        <a href="/terms-of-service.html" style="color:#fff;text-decoration:underline;">Terms of Service</a>
+      </p>
+    </div>
+  </footer>
+
+  <script src="/vendor/jquery/jquery.min.js"></script>
+  <script src="/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" integrity="sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o" crossorigin="anonymous"></script>
+  <script src="/js/auth-config.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/dialog.js"></script>
+  <script src="/js/pwa.js"></script>
+  <script src="/js/resync.js"></script>
+  <script src="/js/teams.js"></script>
+  <script src="/js/ratings.js"></script>
+  <script src="/js/offline.js"></script>
+  <script src="/js/alliance.js"></script>
+  <script src="/js/opr.js"></script>
+  <script src="/js/vision.js"></script>
+  <script src="/js/tables.js"></script>
+  <script>
+  (async function () {
+    var sb = RS.sb;
+    var $ = function (id) { return document.getElementById(id); };
+
+    function esc(s) {
+      return String(s == null ? "" : s)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    }
+    function fmtDate(d) {
+      if (!d) return "—";
+      return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    }
+
+    // ── Access gate (team members only) ──────────────────────────────
+    var s = await RS.session();   // the saved login when offline, so this doesn't bounce to Sign in
+    if (!s) { location.replace("signin.html"); return; }
+    var lvl = await RS.accessLevel();
+    if (lvl === null) return;
+    if (lvl !== "staff" && lvl !== "student") { location.replace("account.html"); return; }
+    var MY_TEAM = ((await RS.team()) || {}).team_number || null;   // the signed-in person's team (js/auth.js)
+
+    // ── Rating config ────────────────────────────────────────────────
+    // Tiers come from a team's percentile among rated teams, ranked by the weighted score from
+    // team_ratings() / team_official_ratings(). Share of rated teams at or below this team's score:
+    //   S: 90%+   A: 75–90%   B: 50–75%   C: 25–50%   D: 10–25%   F: under 10%
+    // NR (not rated) means the team has fewer than MIN_RATED_MATCHES matches. See ratings.html.
+    var TIERS = {
+      S:  { color: "#D4AF37", ink: "#2b2100" },
+      A:  { color: "#1a7f4b", ink: "#ffffff" },
+      B:  { color: "#1B4DB1", ink: "#ffffff" },
+      C:  { color: "#6c3fb5", ink: "#ffffff" },
+      D:  { color: "#e67e22", ink: "#ffffff" },
+      F:  { color: "#c0392b", ink: "#ffffff" },
+      NR: { color: "#9a9a9c", ink: "#ffffff" },
+      TEST: { color: "#17a2b8", ink: "#ffffff" }
+    };
+    var CUTS = [[0.9, "S"], [0.75, "A"], [0.5, "B"], [0.25, "C"], [0.1, "D"]];
+    var MIN_RATED_MATCHES = 3;
+
+    var fields = [], eventsById = {}, summary = [], pitTeams = [], official = [], officialRatings = [], dataCounts = [];
+    var testTeamSet = new Set();   // team numbers staff tagged as test teams — kept out of rating comparisons
+    var teamInfoByNumber = {};     // team_number -> team_info row (js/teams.js): staff-set or from TBA
+
+    function fieldsFor(scope) {
+      return fields.filter(function (f) { return (f.scope || "match") === scope; });
+    }
+    function evName(id) { var e = eventsById[id]; return e ? e.name : "—"; }
+    // The event's level, set per event in the Staff Portal (it also weights the official rating)
+    var TIER_TAGS = {
+      qualifier: ["Qualifier", "A district event or regional"],
+      district_championship: ["District Champs", "A district championship"],
+      championship: ["Worlds", "The FIRST Championship"],
+      offseason: ["Off-season", "An off-season event"]
+    };
+    function tierTag(id) {
+      var e = eventsById[id], t = e && TIER_TAGS[e.event_tier];
+      return t ? '<span class="tier-tag ' + e.event_tier + '" title="' + t[1] + '">' + t[0] + "</span>" : "";
+    }
+    function evTime(id) {
+    var e = eventsById[id];
+    return e && e.event_date ? new Date(String(e.event_date).slice(0, 10) + "T00:00:00Z").getTime() : 0;
+    }
+    // data is the whole match/pit data object the value came from, so "Unsure" and an "Other"
+    // note (both stored under "<key>__unsure" / "<key>__other_note" instead of a scout_fields
+    // row — see the comment on validate_data() in rebuild_all.sql) can be shown alongside it.
+    function cell(v, f, data) {
+      data = data || {};
+      if (f.allow_unsure && data[f.key + "__unsure"]) return "Unsure";
+      if (v == null || v === "") return "—";
+      if (f.field_type === "boolean") return v ? "Yes" : "No";
+      if (f.field_type === "image") {
+        // validate_data() only stores our own https URLs, but check here too: a link is the one
+        // place a stored value could run script (javascript:)
+        if (!/^https:\/\//i.test(String(v))) return "—";
+        return '<a href="' + esc(v) + '" target="_blank" rel="noopener noreferrer"><img src="' + esc(v) +
+          '" alt="Scouted photo" style="height:40px;width:40px;object-fit:cover;"></a>';
+      }
+      var html = esc(v);
+      if (f.field_type === "choice" && v === "Other" && data[f.key + "__other_note"]) {
+        html += ' <span class="text-muted" style="font-size:.85em;">(' + esc(data[f.key + "__other_note"]) + ')</span>';
+      }
+      if (f.reg_limit != null && Number(v) > Number(f.reg_limit)) {
+        html += ' <span class="reg-flag" title="Exceeds the ' + esc(f.reg_limit) + ' limit">Over limit</span>';
+      }
+      return html;
+    }
+
+    // ── Data ─────────────────────────────────────────────────────────
+    async function loadMeta() {
+      var res = await Promise.all([
+        sb.from("scout_fields").select("*").eq("active", true).order("sort_order", { ascending: true }),
+        sb.from("events").select("id,name,event_date,event_tier")
+      ]);
+      fields = res[0].data || [];
+      eventsById = {};
+      (res[1].data || []).forEach(function (e) { eventsById[e.id] = e; });
+    }
+    // Every page of a request (js/ratings.js). The API returns at most 1000 rows per request.
+    var allRows = RSRatings.pagedRows;
+
+    // The three per-team lists the grades compare against. They come from a server-side cache
+    // that refreshes about once a minute, so a team click reuses lists under a minute old.
+    var listsLoadedAt = 0;
+    var RATING_LISTS = ["ratings", "official_ratings", "data_counts"];
+    function applyRatingLists(l) {
+      if (l.ratings.error) console.warn("Scouting rating unavailable:", l.ratings.error.message);
+      if (l.official_ratings.error) console.warn("Official rating unavailable:", l.official_ratings.error.message);
+      if (l.data_counts.error) console.warn("Data-source counts unavailable:", l.data_counts.error.message);
+      summary = l.ratings.error ? [] : l.ratings.data;
+      officialRatings = l.official_ratings.error ? [] : l.official_ratings.data;
+      dataCounts = l.data_counts.error ? [] : l.data_counts.data;
+      if (!RATING_LISTS.some(function (p) { return l[p].error; })) listsLoadedAt = Date.now();
+    }
+    async function ratingLists() {
+      if (Date.now() - listsLoadedAt < 60000) {
+        return [{ data: summary }, { data: officialRatings }, { data: dataCounts }];
+      }
+      var l = await RSRatings.lists(sb, RATING_LISTS);
+      applyRatingLists(l);
+      return RATING_LISTS.map(function (p) { return l[p]; });   // keeps any error, so openTeam can warn
+    }
+    // Everything the team list needs, in one request: the rating lists, the official match
+    // summary, and which teams have pit data
+    async function loadLists() {
+      var l = await RSRatings.lists(sb, RATING_LISTS.concat(["official_summary", "pit_teams"]));
+      applyRatingLists(l);
+      if (l.official_summary.error) console.warn("Official match summary unavailable:", l.official_summary.error.message);
+      official = l.official_summary.error ? [] : l.official_summary.data;
+      if (l.pit_teams.error) console.warn("Pit teams unavailable:", l.pit_teams.error.message);
+      pitTeams = l.pit_teams.error ? [] : l.pit_teams.data;
+    }
+
+    // ── Team list ────────────────────────────────────────────────────
+    async function loadTestTeams() {
+      var r = await sb.from("test_teams").select("team_number");
+      if (r.error) { console.warn("Test teams unavailable:", r.error.message); return; }
+      testTeamSet = new Set((r.data || []).map(function (t) { return t.team_number; }));
+    }
+    async function loadTeamInfo() {
+      var r = await RSTeams.loadInfo(sb);
+      if (r.error) console.warn("Team info unavailable:", r.error.message);
+      teamInfoByNumber = r.info;
+    }
+
+    // Scouted and official counts are shown side by side, never merged into one number —
+    // that merge ("official replaces scouted wherever official data exists") used to be exactly
+    // why a team with a full official record but no scouting coverage looked like it had no data.
+    function teamList() {
+      var byTeam = new Map();
+      function ensure(t) {
+        if (!byTeam.has(t)) byTeam.set(t, { team: t, scouted: 0, official: 0 });
+        return byTeam.get(t);
+      }
+      summary.forEach(function (r) { if (r.team_number != null) ensure(r.team_number).scouted = r.matches; });
+      official.forEach(function (r) { if (r.team_number != null) ensure(r.team_number).official = r.matches; });
+      pitTeams.forEach(function (t) { if (t != null) ensure(t); });
+      return Array.from(byTeam.values());
+    }
+
+    // Grades used for sort/filter, ranked worst-to-best. TEST sits below NR so test teams
+    // (shown only when the checkbox is on) don't clutter the top of a grade-sorted list.
+    var TIER_RANK = { TEST: -1, NR: 0, F: 1, D: 2, C: 3, B: 4, A: 5, S: 6 };
+    function gradeSortValue(g) { return g.pct != null ? 1 + g.pct : TIER_RANK[g.tier]; }
+
+    // Sort fields default to the direction that puts the most useful rows first:
+    // ascending for team #/name, descending (best/most first) for everything else.
+    var SORT_DEFAULT_DIR = { team: 1, name: 1, scouted: -1, official: -1, scoutGrade: -1, offGrade: -1, pit: -1 };
+    var sortDir = 1;
+
+    var selected = null;
+    function renderList() {
+      var q = $("teamSearch").value.trim().toLowerCase();
+      var showTest = $("showTestTeams").checked;
+      var sortKey = $("teamSort").value;
+      var filterKey = $("teamFilter").value;
+      var pitSet = new Set(pitTeams);
+
+      var rows = teamList().map(function (r) {
+        var info = teamInfoByNumber[r.team];
+        return {
+          team: r.team,
+          scouted: r.scouted,
+          official: r.official,
+          name: RSTeams.name(info),
+          logo: RSTeams.logo(info),
+          hasPit: pitSet.has(r.team),
+          gScout: scoutGradeFor(r.team),
+          gOff: officialGradeFor(r.team)
+        };
+      });
+
+      rows = rows.filter(function (r) {
+        if (eventTeams && !eventTeams.has(r.team)) return false;
+        if (!showTest && testTeamSet.has(r.team)) return false;
+        if (q) {
+          var hay = (String(r.team) + " " + r.name).toLowerCase();
+          if (hay.indexOf(q) === -1) return false;
+        }
+        if (filterKey === "rated" && (r.gScout.tier === "NR" || r.gScout.tier === "TEST")) return false;
+        if (filterKey === "unrated" && r.gScout.tier !== "NR") return false;
+        if (filterKey === "haspit" && !r.hasPit) return false;
+        if (filterKey === "nopit" && r.hasPit) return false;
+        return true;
+      });
+
+      rows.sort(function (a, b) {
+        var va, vb;
+        switch (sortKey) {
+          case "name": va = a.name.toLowerCase(); vb = b.name.toLowerCase(); break;
+          case "scouted": va = a.scouted; vb = b.scouted; break;
+          case "official": va = a.official; vb = b.official; break;
+          // Rated teams by percentile (so the best S comes first), then not rated, then test teams
+          case "scoutGrade": va = gradeSortValue(a.gScout); vb = gradeSortValue(b.gScout); break;
+          case "offGrade": va = gradeSortValue(a.gOff); vb = gradeSortValue(b.gOff); break;
+          case "pit": va = a.hasPit ? 1 : 0; vb = b.hasPit ? 1 : 0; break;
+          default: va = a.team; vb = b.team;
+        }
+        if (va < vb) return -1 * sortDir;
+        if (va > vb) return 1 * sortDir;
+        return a.team - b.team;   // stable tie-break
+      });
+
+      $("teamRows").innerHTML = rows.length
+        ? rows.map(function (r) {
+            var dots = '<span class="tier-dot" style="background:' + TIERS[r.gScout.tier].color + ';" title="Scouting: ' + r.gScout.tier + '"></span>' +
+              '<span class="tier-dot" style="background:' + TIERS[r.gOff.tier].color + ';" title="Official: ' + r.gOff.tier + '"></span>';
+            // A missing or broken logo shows a plain placeholder tile, so every row lines up
+            var tile = r.logo
+              ? '<span class="logo-tile"><img src="' + esc(r.logo) + '" alt="" loading="lazy" ' +
+                  'onerror="this.parentNode.classList.add(\'empty\');this.outerHTML=\'<i class=&quot;fa fa-users&quot;></i>\'"></span>'
+              : '<span class="logo-tile empty"><i class="fa fa-users"></i></span>';
+            // Name lives in the tooltip now; the detail card shows it in full
+            return '<div data-team="' + r.team + '" role="button" tabindex="0" class="team-row' + (selected === r.team ? " selected" : "") + '"' +
+                (r.name ? ' title="' + esc(r.team + " " + r.name) + '"' : "") + '>' +
+              '<div class="tr-name">' + tile +
+                '<span class="tr-id"><strong>' + r.team + '</strong><span class="tr-dots">' + dots + '</span></span>' +
+              "</div>" +
+              '<div class="tr-stats-line">' +
+                '<div class="tr-stat" title="Human-scouted matches"><span class="stat-v">' + r.scouted + '</span><span class="stat-k">Scouted</span></div>' +
+                '<div class="tr-stat" title="Synced from FRC Events / TBA"><span class="stat-v">' + r.official + '</span><span class="stat-k">API</span></div>' +
+                '<div class="tr-stat" title="Has pit data"><span class="stat-v">' + (r.hasPit ? '<i class="fa fa-check" style="color:var(--green);"></i>' : "—") + '</span><span class="stat-k">Pit</span></div>' +
+              '</div>' +
+              '</div>';
+          }).join("")
+        : '<div class="text-muted text-center py-3">No teams match.</div>';
+      $("teamCount").textContent = rows.length + (rows.length === 1 ? " team" : " teams");
+    }
+    $("teamSearch").addEventListener("input", renderList);
+    $("showTestTeams").addEventListener("change", renderList);
+    $("teamFilter").addEventListener("change", renderList);
+    $("teamSort").addEventListener("change", function () {
+      sortDir = SORT_DEFAULT_DIR[$("teamSort").value] || 1;
+      updateSortDirIcon();
+      renderList();
+    });
+    $("sortDir").addEventListener("click", function () {
+      sortDir = sortDir * -1;
+      updateSortDirIcon();
+      renderList();
+    });
+    function updateSortDirIcon() {
+      $("sortDirIcon").className = "fa " + (sortDir === 1 ? "fa-sort-amount-asc" : "fa-sort-amount-desc");
+    }
+    $("teamRows").addEventListener("click", function (e) {
+      var row = e.target.closest(".team-row[data-team]");
+      if (row) openTeam(parseInt(row.dataset.team, 10));
+    });
+    // Rows are divs, so Enter and Space need wiring up for keyboard users
+    $("teamRows").addEventListener("keydown", function (e) {
+      var row = e.target.closest(".team-row[data-team]");
+      if (!row || (e.key !== "Enter" && e.key !== " ")) return;
+      e.preventDefault();
+      var team = row.dataset.team;
+      openTeam(parseInt(team, 10));
+      $("teamRows").querySelector('[data-team="' + team + '"]').focus();   // the list was redrawn
+    });
+
+    // ── Ratings (computed on click from the latest summary) ──────────
+    // Two independent grades. Each is blind to the other's data source, on purpose — see the
+    // comment on team_ratings() in rebuild_all.sql for why blending them was a problem.
+    // Test teams (tagged in the Staff Portal) are dropped from the comparison pool for both, so
+    // a dummy number used to try out the Scout form never shifts a real team's percentile.
+    function scoutGradeFor(team) {
+      var pool = summary.filter(function (r) { return !testTeamSet.has(r.team_number); });
+      var rated = pool.filter(function (r) { return r.matches >= MIN_RATED_MATCHES; });
+      var me = summary.find(function (r) { return r.team_number === team; });
+      if (testTeamSet.has(team)) {
+        return { tier: "TEST", matches: me ? me.matches : 0, avg: me ? Number(me.avg_points) : null, n: rated.length, pct: null };
+      }
+      if (!me || me.matches < MIN_RATED_MATCHES) {
+        return { tier: "NR", matches: me ? me.matches : 0, avg: me ? Number(me.avg_points) : null, n: rated.length, pct: null };
+      }
+      var avg = Number(me.avg_points);
+      var score = Number(me.score);
+      var atOrBelow = rated.filter(function (r) { return Number(r.score) <= score; }).length;
+      var pct = atOrBelow / rated.length;
+      var tier = "F";
+      for (var i = 0; i < CUTS.length; i++) {
+        if (pct >= CUTS[i][0]) { tier = CUTS[i][1]; break; }
+      }
+      return { tier: tier, matches: me.matches, avg: avg, n: rated.length, pct: pct };
+    }
+
+    function officialGradeFor(team) {
+      var pool = officialRatings.filter(function (r) { return !testTeamSet.has(r.team_number); });
+      // The official score is OPR, which needs 3 qualification matches; without it a team isn't rated
+      var rated = pool.filter(function (r) { return r.matches >= MIN_RATED_MATCHES && r.score != null; });
+      var me = officialRatings.find(function (r) { return r.team_number === team; });
+      if (testTeamSet.has(team)) {
+        return { tier: "TEST", matches: me ? me.matches : 0, avg: me ? Number(me.avg_alliance_score) : null, n: rated.length, pct: null };
+      }
+      if (!me || me.matches < MIN_RATED_MATCHES || me.score == null) {
+        return { tier: "NR", matches: me ? me.matches : 0, avg: me ? Number(me.avg_alliance_score) : null, n: rated.length, pct: null };
+      }
+      var avg = Number(me.avg_alliance_score);
+      var score = Number(me.score);
+      var atOrBelow = rated.filter(function (r) { return Number(r.score) <= score; }).length;
+      var pct = atOrBelow / rated.length;
+      var tier = "F";
+      for (var i = 0; i < CUTS.length; i++) {
+        if (pct >= CUTS[i][0]) { tier = CUTS[i][1]; break; }
+      }
+      return { tier: tier, matches: me.matches, avg: avg, opr: score, n: rated.length, pct: pct };
+    }
+
+    function ratingBox(label, g) {
+      var c = TIERS[g.tier];
+      var big = g.tier === "TEST" ? "T" : g.tier;
+      var meta = g.tier === "TEST" ? "Test team" : g.tier === "NR" ? "Not rated" : (g.matches + (g.matches === 1 ? " match" : " matches"));
+      return '<div class="rating-wrap">' +
+        '<div class="rating-box" style="background:' + c.color + ';color:' + c.ink + ';">' +
+          '<span class="rating-letter">' + big + '</span>' +
+          '<span class="rating-caption">' + esc(label) + '</span>' +
+        '</div>' +
+        '<div class="rating-meta">' + meta + '</div>' +
+      '</div>';
+    }
+
+    // value: what the grade is built on, e.g. "avg 41 pts" or "adds about 64 pts per match (OPR)"
+    function basisText(label, value, g) {
+      if (g.tier === "TEST") {
+        return label + ": tagged as a test team — excluded from the rated-teams comparison.";
+      }
+      if (g.tier === "NR") {
+        return label + ": needs at least " + MIN_RATED_MATCHES + " matches to be rated (" + g.matches + " so far).";
+      }
+      return label + ": " + value + ". Rated at or above " + Math.round(g.pct * 100) + "% of " + g.n + " rated teams.";
+    }
+
+    // ── Team detail ──────────────────────────────────────────────────
+    async function openTeam(team) {
+      selected = team;
+      renderList();
+      $("detail").innerHTML = '<div class="loading-msg">Calculating rating…</div>';
+      // On narrow screens the list and detail panel stack vertically, so jump down to the
+      // detail panel on selection instead of leaving the person to scroll past the whole list.
+      if (window.innerWidth < 992) {
+        $("detail").scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      // Rating lists are refetched when over a minute old, so the grades stay current
+      var lists = ratingLists();
+      var results = await Promise.all([
+        lists.then(function (r) { return r[0]; }),
+        lists.then(function (r) { return r[1]; }),
+        lists.then(function (r) { return r[2]; }),
+        sb.from("scouting_entries").select("*").eq("team_number", team)
+          .order("match_number", { ascending: true, nullsFirst: false }),
+        sb.from("pit_entries").select("*").eq("team_number", team)
+          .order("updated_at", { ascending: false }),
+        // Through the team indexes; filtering the official_match_teams view by team times out
+        sb.rpc("official_match_teams_for", { p_teams: [team] })
+          .select("event_id,match_key,comp_level,set_number,match_number,alliance,station,alliance_score,opponent_score,played_at,breakdown")
+          .order("played_at", { ascending: true, nullsFirst: false }),
+        // Who was on each alliance, for the partner and opponent columns
+        sb.rpc("official_lineups_for", { p_teams: [team] }),
+        sb.from("vision_robots").select("event_id,match_key,alliance,data,confidence").eq("team_number", team)
+      ]);
+      if (selected !== team) return;   // clicked another team while this one loaded
+      summary = results[0].error ? [] : (results[0].data || []);
+      officialRatings = results[1].error ? [] : (results[1].data || []);
+      dataCounts = results[2].error ? [] : (results[2].data || []);
+      var matches = results[3].data || [];
+      var pits = results[4].data || [];
+      var officialRows = results[5].error ? [] : (results[5].data || []);
+      var officialErr = results[5].error || null;
+      // Optional extra detail, so a failure here only leaves those columns blank
+      if (results[6].error) console.warn("Match line-ups unavailable:", results[6].error.message);
+      var lineups = {};
+      (results[6].data || []).forEach(function (m) { lineups[m.event_id + "|" + m.match_key] = m; });
+
+      // A failed request would otherwise read as a team with no data or no rating
+      var failed = results.slice(0, 5).some(function (r) { return r.error; });
+      if (results[7].error) console.warn("Vision data unavailable:", results[7].error.message);
+      var extra = { vision: results[7].data || [], opr: await loadOpr(officialRows) };
+      if (selected !== team) return;
+      renderDetail(team, scoutGradeFor(team), officialGradeFor(team), matches, pits, officialRows, officialErr, lineups, failed, extra);
+    }
+
+    // Component OPR (js/opr.js) needs every qualification match at each of the team's events,
+    // not just the team's own. Returns [{ event_id, result }], oldest event first.
+    async function loadOpr(officialRows) {
+      var ids = Array.from(new Set(playedMatches(officialRows).map(function (r) { return r.event_id; })));
+      if (!ids.length) return [];
+      var rows = [], size = 1000;
+      for (var from = 0; ; from += size) {
+        var r = await sb.from("official_matches_combined")
+          .select("event_id,match_key,comp_level,red_teams,blue_teams,red_score,blue_score,red_breakdown,blue_breakdown")
+          .in("event_id", ids).eq("comp_level", "qm").order("event_id").order("match_key").range(from, from + size - 1);
+        if (r.error) { console.warn("OPR data unavailable:", r.error.message); return []; }
+        rows = rows.concat(r.data || []);
+        if ((r.data || []).length < size) break;
+      }
+      return ids.map(function (id) {
+        return { event_id: id, result: RSOpr.compute(rows.filter(function (m) { return m.event_id === id; })) };
+      }).sort(function (a, b) { return evTime(a.event_id) - evTime(b.event_id); });
+    }
+
+    function matchLabel(r) {
+      if (r.comp_level === "qm") return "Qual " + r.match_number;
+      if (r.comp_level === "sf") return "Playoff " + r.set_number_label;
+      return "Final " + r.match_number;
+    }
+    // Turns a Supabase error into a visible, plain-language notice.
+    function accessNotice(err, what) {
+      var denied = err && (err.code === "42501" ||
+        /permission denied|forbidden|row-level security/i.test(err.message || ""));
+      var text = denied
+        ? "You don't have permission to view " + what + ". Ask a staff member to confirm your access level, " +
+          "or that the database permissions for this feature have been applied."
+        : "Couldn't load " + what + (err && err.message ? " (" + err.message + ")" : "") +
+          ". Try refreshing the page.";
+      return '<div class="alert alert-warning" role="alert" style="font-size:.9rem;">' + esc(text) + '</div>';
+    }
+
+    // ── Insights ─────────────────────────────────────────────────────
+    function tileGrid(tiles) {
+      return '<div class="tile-grid">' +
+        tiles.map(function (t) {
+          return '<div class="tile"><div class="v">' + esc(t[1]) + '</div><div class="k">' + esc(t[0]) + "</div></div>";
+        }).join("") +
+      "</div>";
+    }
+    function mean(vals) {
+      return vals.length ? vals.reduce(function (a, b) { return a + b; }, 0) / vals.length : null;
+    }
+    function signed(v) { return (v > 0 ? "+" : "") + v.toFixed(1); }
+
+    // Official matches that have a score, oldest first. Sorted by event and match order because
+    // played_at can be empty. Ties count as played but not as wins.
+    var LEVEL_ORDER = { qm: 0, sf: 1, f: 2 };
+    function playedMatches(rows) {
+      return rows.filter(function (r) { return r.alliance_score != null && r.opponent_score != null; })
+        .sort(function (a, b) {
+          return (evTime(a.event_id) - evTime(b.event_id)) ||
+            (LEVEL_ORDER[a.comp_level] - LEVEL_ORDER[b.comp_level]) ||
+            ((a.set_number || 0) - (b.set_number || 0)) || (a.match_number - b.match_number);
+        });
+    }
+    function resultOf(r) {
+      return r.alliance_score > r.opponent_score ? "W" : r.alliance_score < r.opponent_score ? "L" : "T";
+    }
+    function countResult(rows, result) {
+      return rows.filter(function (r) { return resultOf(r) === result; }).length;
+    }
+    function winPct(rows) {
+      return rows.length ? Math.round(100 * countResult(rows, "W") / rows.length) + "%" : "—";
+    }
+    function recordOf(rows) {
+      return countResult(rows, "W") + "-" + countResult(rows, "L") + "-" + countResult(rows, "T");
+    }
+    function marginOf(r) { return r.alliance_score - r.opponent_score; }
+
+    function officialInsightTiles(played) {
+      var quals = played.filter(function (r) { return r.comp_level === "qm"; });
+      var playoffs = played.filter(function (r) { return r.comp_level !== "qm"; });
+      var scores = played.map(function (r) { return r.alliance_score; });
+      var margins = played.map(marginOf);
+      var last = played.slice(-5);
+      var streak = 0, longest = 0;
+      played.forEach(function (r) {
+        streak = resultOf(r) === "W" ? streak + 1 : 0;
+        longest = Math.max(longest, streak);
+      });
+      var tiles = [
+        ["Wins", countResult(played, "W")], ["Losses", countResult(played, "L")], ["Ties", countResult(played, "T")]
+      ];
+      if (quals.length) tiles.push(["Qualification win % (" + quals.length + ")", winPct(quals)]);
+      if (playoffs.length) tiles.push(["Playoff win % (" + playoffs.length + ")", winPct(playoffs)]);
+      ["red", "blue"].forEach(function (color) {
+        var side = played.filter(function (r) { return r.alliance === color; });
+        if (side.length) tiles.push([(color === "red" ? "Red" : "Blue") + " win % (" + side.length + ")", winPct(side)]);
+      });
+      [1, 2, 3].forEach(function (station) {
+        var spot = played.filter(function (r) { return r.station === station; });
+        if (spot.length) tiles.push(["Station " + station + " win % (" + spot.length + ")", winPct(spot)]);
+      });
+      tiles.push(["Avg score margin", signed(mean(margins))]);
+      tiles.push(["Avg opponent score", mean(played.map(function (r) { return r.opponent_score; })).toFixed(1)]);
+      tiles.push(["Best alliance score", Math.max.apply(null, scores)]);
+      tiles.push(["Lowest alliance score", Math.min.apply(null, scores)]);
+      var biggest = Math.max.apply(null, margins), worst = Math.min.apply(null, margins);
+      if (biggest > 0) tiles.push(["Biggest win", "+" + biggest]);
+      if (worst < 0) tiles.push(["Biggest loss", worst]);
+      tiles.push(["Longest win streak", longest]);
+      if (scores.length >= 3) {
+        // Standard deviation: the typical swing in score from match to match, so lower is steadier
+        var avg = mean(scores);
+        var spread = Math.sqrt(mean(scores.map(function (s) { return (s - avg) * (s - avg); })));
+        tiles.push(["Score swing (std dev)", "±" + spread.toFixed(1)]);
+      }
+      tiles.push(["Last " + last.length + " (newest last)", last.map(resultOf).join(" ")]);
+      return tiles;
+    }
+    // Only worth showing once a team has played more than one event
+    function eventBreakdownHtml(played) {
+      var ids = Array.from(new Set(played.map(function (r) { return r.event_id; })));
+      if (ids.length < 2) return "";
+      var body = ids.map(function (id) {
+        var rows = played.filter(function (r) { return r.event_id === id; });
+        return "<tr><td>" + esc(evName(id)) + "</td><td>" + tierTag(id) + "</td><td>" + recordOf(rows) + "</td><td>" + winPct(rows) + "</td>" +
+          "<td>" + mean(rows.map(function (r) { return r.alliance_score; })).toFixed(1) + "</td>" +
+          "<td>" + signed(mean(rows.map(marginOf))) + "</td></tr>";
+      }).join("");
+      return '<div class="table-responsive mt-3"><table data-sortable="q-events" class="table match-table"><thead><tr>' +
+        "<th>Event</th><th>Level</th><th>Record</th><th>Win %</th><th>Avg score</th><th>Avg margin</th>" +
+        "</tr></thead><tbody>" + body + "</tbody></table></div>";
+    }
+
+    // Same check as team_ratings(): skips entries from earlier seasons' forms.
+    var SEASON_KEYS = ["stuck_on_field", "foul_or_card", "auto_fuel_hub", "teleop_fuel_hub", "auto_tower", "teleop_tower"];
+    function numbersFor(rows, key) {
+      return rows.map(function (m) { return m.data[key]; })
+        .filter(function (v) { return v != null && v !== "" && isFinite(Number(v)); }).map(Number);
+    }
+    // Most common answer to a choice field, as "Scorer (75%)". Null if nobody answered it.
+    function topChoice(rows, key) {
+      var counts = {}, total = 0, top = null;
+      rows.forEach(function (m) {
+        var v = m.data[key];
+        if (v == null || v === "") return;
+        counts[v] = (counts[v] || 0) + 1;
+        total++;
+        if (top == null || counts[v] > counts[top]) top = v;
+      });
+      return top == null ? null : top + " (" + Math.round(100 * counts[top] / total) + "%)";
+    }
+    function seasonRows(matches) {
+      return matches.filter(function (m) {
+        return m.data && SEASON_KEYS.some(function (k) { return k in m.data; });
+      });
+    }
+    // matches must already be oldest first
+    function scoutedInsightTiles(matches) {
+      var rows = seasonRows(matches);
+      var tiles = [];
+      function addAvg(label, key, suffix) {
+        var vals = numbersFor(rows, key);
+        if (vals.length) tiles.push([label, mean(vals).toFixed(1) + (suffix || "")]);
+      }
+      addAvg("Avg auto FUEL", "auto_fuel_hub");
+      addAvg("Avg teleop FUEL", "teleop_fuel_hub");
+
+      var teleop = numbersFor(rows, "teleop_fuel_hub");
+      if (teleop.length) tiles.push(["Best teleop FUEL", Math.max.apply(null, teleop)]);
+      // Needs a few earlier matches to compare against, or one good match reads as a trend
+      if (teleop.length >= 5) {
+        tiles.push(["Teleop FUEL trend (last 3 vs earlier)",
+          signed(mean(teleop.slice(-3)) - mean(teleop.slice(0, -3)))]);
+      }
+      addAvg("Avg accuracy", "shooter_accuracy", " / 5");
+
+      var climbs = rows.map(function (m) { return m.data.teleop_tower; })
+        .filter(function (v) { return v != null && v !== ""; });
+      if (climbs.length) {
+        var climbed = climbs.filter(function (v) { return v !== "None"; });
+        var best = climbed.slice().sort().pop();
+        tiles.push(["Climb rate" + (best ? " (best " + best + ")" : ""),
+          Math.round(100 * climbed.length / climbs.length) + "%"]);
+      }
+      var role = topChoice(rows, "teleop_role");
+      if (role) tiles.push(["Usual role", role]);
+      var source = topChoice(rows, "teleop_fuel_source");
+      if (source) tiles.push(["Main FUEL source", source]);
+      return tiles;
+    }
+    // The parts of the scouting rating, from team_ratings().components (each is 0-100)
+    var RATING_PARTS = [
+      ["fuel", "FUEL scoring"], ["climb", "Climbing"], ["auto", "Autonomous"], ["efficiency", "Shooting efficiency"],
+      ["reliability", "Reliability"], ["discipline", "Fouls avoided"], ["pit", "Robot capability"]
+    ];
+    // Position among rated teams, using the same pool as the letter grade
+    function rankText(rows, team) {
+      var pool = rows.filter(function (r) { return !testTeamSet.has(r.team_number) && r.matches >= MIN_RATED_MATCHES && r.score != null; });
+      var me = pool.find(function (r) { return r.team_number === team; });
+      if (!me) return null;
+      var ahead = pool.filter(function (r) { return Number(r.score) > Number(me.score); }).length;
+      return (ahead + 1) + " of " + pool.length;
+    }
+    function ratingBreakdownHtml(team) {
+      var me = summary.find(function (r) { return r.team_number === team; });
+      var off = officialRatings.find(function (r) { return r.team_number === team; });
+      var tiles = [];
+      if (me) tiles.push(["Scouting score (0–100)", me.score]);
+      if (rankText(summary, team)) tiles.push(["Scouting rank", rankText(summary, team)]);
+      if (off && off.score != null) tiles.push(["Official OPR (pts added / match)", off.score]);
+      if (rankText(officialRatings, team)) tiles.push(["Official rank", rankText(officialRatings, team)]);
+      var parts = me && me.components ? me.components : {};
+      var rows = RATING_PARTS.filter(function (p) { return parts[p[0]] != null; }).map(function (p) {
+        var v = Math.max(0, Math.min(100, Number(parts[p[0]])));
+        return '<div class="rating-part"><span class="rp-label">' + esc(p[1]) + "</span>" +
+          '<span class="rp-track"><span class="rp-fill" style="width:' + v + '%;"></span></span>' +
+          '<span class="rp-value">' + Math.round(v) + "</span></div>";
+      }).join("");
+      if (!tiles.length && !rows) return "";
+      return '<h3 class="section-title">Rating breakdown</h3>' +
+        (tiles.length ? tileGrid(tiles) : "") +
+        (rows ? '<div class="mt-3">' + rows + "</div>" : "") +
+        '<p class="insight-note">' +
+          (rows ? "The bars are what make up the scouting grade, each from 0 to 100. Higher is better. " : "") +
+          '<a href="/ratings.html">How ratings work</a></p>';
+    }
+
+    // ── Full stat tables ─────────────────────────────────────────────
+    function statBlock(title, badge, body) {
+      return '<details class="stat-block" open><summary><h3 class="section-title">' + esc(title) + badge + "</h3></summary>" +
+        body + "</details>";
+    }
+    // One table row for a list of raw values, chosen by what they are: yes/no answers give a
+    // Yes %, numbers give average, low and high, and anything else gives each answer's share.
+    function statRowHtml(label, raw) {
+      var vals = raw.filter(function (v) { return v != null && v !== ""; });
+      if (!vals.length) return "";
+      var head = "<tr><td>" + esc(label) + "</td><td>" + vals.length + "</td>";
+      if (vals.every(function (v) { return typeof v === "boolean"; })) {
+        var yes = vals.filter(function (v) { return v; }).length;
+        return head + '<td colspan="3">Yes ' + Math.round(100 * yes / vals.length) + "%</td></tr>";
+      }
+      if (vals.every(function (v) { return isFinite(Number(v)); })) {
+        var nums = vals.map(Number);
+        return head + "<td>" + mean(nums).toFixed(1) + "</td><td>" + Math.min.apply(null, nums) + "</td>" +
+          "<td>" + Math.max.apply(null, nums) + "</td></tr>";
+      }
+      var counts = {};
+      vals.forEach(function (v) { counts[v] = (counts[v] || 0) + 1; });
+      var mix = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; }).map(function (k) {
+        return esc(k) + " " + Math.round(100 * counts[k] / vals.length) + "%";
+      }).join(" · ");
+      return head + '<td colspan="3" class="stat-mix">' + mix + "</td></tr>";
+    }
+    function statTableHtml(countLabel, body) {
+      return '<div class="table-responsive"><table class="table match-table"><thead><tr>' +
+        "<th>Stat</th><th>" + esc(countLabel) + "</th><th>Average</th><th>Low</th><th>High</th>" +
+        "</tr></thead><tbody>" + body + "</tbody></table></div>";
+    }
+    // Built from the active form fields, so a field staff add later shows up here on its own.
+    // Text and photo fields are skipped because they can't be summarized. They're in Match history.
+    function scoutedStatsHtml(matches, mFields) {
+      var rows = seasonRows(matches);
+      var section = null, body = "";
+      mFields.forEach(function (f) {
+        if (f.field_type === "text" || f.field_type === "image") return;
+        var row = statRowHtml(f.label, rows.map(function (m) { return m.data[f.key]; }));
+        if (!row) return;
+        if (f.section !== section) {
+          section = f.section;
+          body += '<tr class="stat-section"><td colspan="5">' + esc(section) + "</td></tr>";
+        }
+        body += row;
+      });
+      return body
+        ? statBlock("All scouted stats", '<span class="src-badge scout">Scouted</span>', statTableHtml("Entries", body))
+        : "";
+    }
+    // Average of every numeric field at each event, once a team has been scouted at more than one
+    function scoutedByEventHtml(matches, mFields) {
+      var rows = seasonRows(matches);
+      var ids = Array.from(new Set(rows.map(function (m) { return m.event_id; })));
+      if (ids.length < 2) return "";
+      var cols = mFields.filter(function (f) {
+        return (f.field_type === "number" || f.field_type === "slider") && numbersFor(rows, f.key).length;
+      });
+      var body = ids.map(function (id) {
+        var here = rows.filter(function (m) { return m.event_id === id; });
+        return "<tr><td>" + esc(evName(id)) + "</td><td>" + tierTag(id) + "</td><td>" + here.length + "</td>" +
+          cols.map(function (f) {
+            var vals = numbersFor(here, f.key);
+            return "<td>" + (vals.length ? mean(vals).toFixed(1) : "—") + "</td>";
+          }).join("") + "</tr>";
+      }).join("");
+      return statBlock("Scouted averages by event", '<span class="src-badge scout">Scouted</span>',
+        '<div class="table-responsive"><table data-sortable="q-pit" class="table match-table"><thead><tr><th>Event</th><th>Level</th><th>Entries</th>' +
+          cols.map(function (f) { return "<th>" + esc(f.label) + "</th>"; }).join("") +
+        "</tr></thead><tbody>" + body + "</tbody></table></div>");
+    }
+    // Pit answers side by side when a team has entries from more than one event, newest first
+    function pitHistoryHtml(pits, pFields) {
+      if (pits.length < 2) return "";
+      var body = pFields.map(function (f) {
+        var cells = pits.map(function (p) { return cell(p.data ? p.data[f.key] : null, f, p.data); });
+        if (cells.every(function (c) { return c === "—"; })) return "";
+        return "<tr><td>" + esc(f.label) + "</td>" + cells.map(function (c) { return "<td>" + c + "</td>"; }).join("") + "</tr>";
+      }).join("");
+      return body
+        ? statBlock("Pit history", '<span class="src-badge scout">Scouted</span>',
+            '<div class="table-responsive"><table class="table match-table"><thead><tr><th>Field</th>' +
+              pits.map(function (p) { return "<th>" + esc(evName(p.event_id)) + "</th>"; }).join("") +
+            "</tr></thead><tbody>" + body + "</tbody></table></div>")
+        : "";
+    }
+
+    // The score breakdown is stored exactly as FRC Events or TBA sent it, and its keys change
+    // every game, so nothing here names a key. Nested values are flattened, and a per-robot value
+    // such as "towerRobot2" is kept only for the station this team was in.
+    function prettyKey(k) {
+      var s = k.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/_/g, " ");
+      return s.charAt(0).toUpperCase() + s.slice(1);
+    }
+    function flattenBreakdown(obj, prefix, station, out) {
+      Object.keys(obj).forEach(function (k) {
+        var v = obj[k];
+        if (v == null || Array.isArray(v)) return;
+        var label = prefix + prettyKey(k);
+        if (typeof v === "object") { flattenBreakdown(v, label + ": ", station, out); return; }
+        var robot = /^(.+?)Robot([1-3])$/i.exec(k);
+        if (robot) {
+          if (Number(robot[2]) !== station) return;
+          label = prefix + prettyKey(robot[1]) + " (this robot)";
+        }
+        (out[label] = out[label] || []).push(v);
+      });
+    }
+    function scoreBreakdownHtml(played) {
+      var byLabel = {};
+      played.forEach(function (r) {
+        if (r.breakdown && typeof r.breakdown === "object") flattenBreakdown(r.breakdown, "", r.station, byLabel);
+      });
+      var body = Object.keys(byLabel).map(function (label) { return statRowHtml(label, byLabel[label]); }).join("");
+      return body
+        ? statBlock("Score breakdown", '<span class="src-badge api">API</span>',
+            statTableHtml("Matches", body) +
+            '<p class="insight-note mb-3">Everything FRC Events or TBA reported, across played matches. ' +
+              'These are alliance totals unless marked "this robot".</p>')
+        : "";
+    }
+
+    // One column per event: the team's estimate for every score field, and its rank there
+    function oprHtml(team, opr) {
+      var events = (opr || []).filter(function (e) { return e.result.teams[team] && e.result.teams[team].score != null; });
+      if (!events.length) return "";
+      var paths = [];
+      events.forEach(function (e) {
+        e.result.fields.forEach(function (f) { if (paths.indexOf(f) === -1) paths.push(f); });
+      });
+      function cellFor(e, f) {
+        var v = f ? e.result.teams[team].fields[f] : e.result.teams[team].score;
+        if (v == null) return "<td>—</td>";
+        var rk = RSOpr.rankOf(e.result, team, f);
+        return "<td>" + v.toFixed(1) + (rk ? ' <span class="text-muted" style="font-size:.85em;">(' + rk.rank + " of " + rk.of + ")</span>" : "") + "</td>";
+      }
+      function label(f) { return f.split(".").map(prettyKey).join(": "); }
+      var body = "<tr><td><strong>Total score</strong></td>" + events.map(function (e) { return cellFor(e, null); }).join("") + "</tr>" +
+        paths.map(function (f) {
+          return "<tr><td>" + esc(label(f)) + "</td>" + events.map(function (e) { return cellFor(e, f); }).join("") + "</tr>";
+        }).join("");
+      return statBlock("Estimated contribution (OPR)", '<span class="src-badge api">API</span>',
+        '<div class="table-responsive"><table class="table match-table"><thead><tr><th>Field</th>' +
+          events.map(function (e) { return "<th>" + esc(evName(e.event_id)) + "</th>"; }).join("") +
+        "</tr></thead><tbody>" + body + "</tbody></table></div>" +
+        '<p class="insight-note mb-3">How much of each alliance number this team adds, estimated from every qualification ' +
+          "match at the event. The rank is among teams there, highest first. " +
+          '<a href="/ratings.html#opr">How this is worked out</a></p>');
+    }
+
+    // Vision worker estimates (vision_robots). Shown on their own, never mixed into a rating.
+    function visionHtml(rows) {
+      if (!rows.length) return "";
+      rows = rows.slice().sort(function (a, b) {
+        return (evTime(a.event_id) - evTime(b.event_id)) || a.match_key.localeCompare(b.match_key, undefined, { numeric: true });
+      });
+      var body = RSVision.FIELDS.map(function (f) {
+        var vals = rows.map(function (r) { return r.data ? r.data[f[0]] : null; });
+        if (f[2] === "share") vals = vals.map(function (v) { return v == null ? v : Math.round(Number(v) * 100); });
+        return statRowHtml(f[1] + (f[2] === "share" ? " (%)" : ""), vals);
+      }).join("");
+      var cols = RSVision.FIELDS.slice(0, 6);
+      var perMatch = rows.map(function (r) {
+        var low = Number(r.confidence) < RSVision.LOW_CONFIDENCE;
+        return "<tr><td>" + esc(evName(r.event_id)) + "</td><td>" + esc(r.match_key) + "</td>" +
+          "<td>" + Math.round(Number(r.confidence) * 100) + "%" + (low ? ' <span class="reg-flag">Low</span>' : "") + "</td>" +
+          cols.map(function (f) { return "<td>" + RSVision.fmt(f[2], r.data ? r.data[f[0]] : null) + "</td>"; }).join("") + "</tr>";
+      }).join("");
+      return '<h3 class="section-title">Vision estimates<span class="src-badge vision">Vision</span></h3>' +
+        statTableHtml("Matches", body) +
+        '<div class="table-responsive"><table data-sortable="q-vision" class="table match-table"><thead><tr><th>Event</th><th>Match</th><th>Confidence</th>' +
+          cols.map(function (f) { return "<th>" + esc(f[1]) + "</th>"; }).join("") +
+        "</tr></thead><tbody>" + perMatch + "</tbody></table></div>" +
+        '<p class="insight-note mb-3">Read by computer from match video, so treat these as estimates. ' +
+          "They aren't part of either rating. " + '<a href="/ratings.html#vision">How vision estimates work</a></p>';
+    }
+
+    function officialHtml(rows, err, team, lineups, opr) {
+      var head = '<h3 class="section-title">Official results<span class="src-badge api">API</span></h3>';
+      if (err) return head + accessNotice(err, "official match data");
+      if (!rows.length) {
+        return head + '<p class="text-muted">No official match data yet. Link this event to its FRC / TBA codes in the Staff Portal.</p>';
+      }
+      rows.forEach(function (r) {
+        r.set_number_label = (r.match_key.match(/^sf(\d+)/) || [])[1] || r.match_number;
+      });
+      var played = playedMatches(rows);
+      var n = played.length;
+      var avgScore = mean(played.map(function (r) { return r.alliance_score; }));
+      var body = rows.map(function (r) {
+        var played = r.alliance_score != null && r.opponent_score != null;
+        var result = !played ? "—" : r.alliance_score > r.opponent_score ? "W" : r.alliance_score < r.opponent_score ? "L" : "T";
+        var lineup = lineups[r.event_id + "|" + r.match_key];
+        var mine = lineup ? (r.alliance === "red" ? lineup.red_teams : lineup.blue_teams) : null;
+        var theirs = lineup ? (r.alliance === "red" ? lineup.blue_teams : lineup.red_teams) : null;
+        var partners = mine ? mine.filter(function (t) { return t !== team; }).join(", ") : "—";
+        var source = !lineup ? "—" : esc(lineup.sources.toUpperCase()) + (lineup.scores_agree === false ? " (scores differ)" : "");
+        return "<tr><td>" + esc(evName(r.event_id)) + "</td><td>" + tierTag(r.event_id) + "</td><td>" + esc(matchLabel(r)) + "</td>" +
+          "<td>" + esc(r.alliance) + (r.station ? " " + r.station : "") + "</td>" +
+          "<td>" + (played ? r.alliance_score + " – " + r.opponent_score : "—") + "</td>" +
+          "<td>" + result + "</td>" +
+          "<td>" + esc(partners) + "</td><td>" + esc(theirs ? theirs.join(", ") : "—") + "</td>" +
+          "<td>" + source + "</td><td>" + allianceViewLink(lineup) + "</td></tr>";
+      }).join("");
+      var upcoming = rows.length - n;
+      return head +
+        '<p class="text-muted mb-2" style="font-size:.9rem;">Record ' + recordOf(played) +
+        " · " + n + " matches played" +
+        (upcoming ? " · " + upcoming + " not played yet" : "") +
+        (n ? " · avg alliance score " + avgScore.toFixed(1) : "") + "</p>" +
+        (n
+          ? tileGrid(officialInsightTiles(played)) + eventBreakdownHtml(played) +
+            '<p class="insight-note mb-3">Official results are for the whole alliance, so they reflect a team\'s partners too.</p>' +
+            scoreBreakdownHtml(played) + oprHtml(team, opr)
+          : "") +
+        '<div class="table-responsive"><table data-sortable="q-official" class="table match-table"><thead><tr>' +
+        "<th>Event</th><th>Level</th><th>Match</th><th>Alliance</th><th>Score (us – them)</th><th>Result</th>" +
+        "<th>Partners</th><th>Opponents</th><th>Source</th><th></th>" +
+        "</tr></thead><tbody>" + body + "</tbody></table></div>";
+    }
+
+    // Opens a match's two alliances in the Alliance View
+    function allianceViewLink(lineup) {
+      if (!lineup || !(lineup.red_teams || []).length || !(lineup.blue_teams || []).length) return "";
+      return '<a href="/alliance.html?red=' + lineup.red_teams.join(",") + "&blue=" + lineup.blue_teams.join(",") +
+        '" title="Open this match in the Alliance View"><i class="fa fa-columns"></i><span class="sr-only">Alliance View</span></a>';
+    }
+
+    // Red and Blue buttons for the Alliance View. Clicking the team's own alliance removes it;
+    // clicking the other one moves it. A full alliance disables its button.
+    function allianceButton(team, color, label) {
+      var current = Alliance.colorOf(team);
+      var full = current !== color && Alliance.get()[color].length >= Alliance.MAX;
+      var text = current === color ? "Remove from " + label
+        : full ? label + " full"
+        : (current ? "Move to " : "Add to ") + label;
+      return '<button type="button" class="btn btn-sm btn-' + color + '" data-alliance="' + color + '"' +
+        (full ? " disabled" : "") + ">" + text + "</button>";
+    }
+    function allianceActionsHtml(team) {
+      var picks = Alliance.get();
+      return allianceButton(team, "red", "Red Alliance") + allianceButton(team, "blue", "Blue Alliance") +
+        '<a class="view-link" href="/alliance.html">View alliances (' + (picks.red.length + picks.blue.length) + " of 6)</a>" +
+        exportButtonsHtml() +
+        '<button type="button" class="btn btn-outline-secondary btn-sm offline-btn" data-offline-team="' + team + '" ' +
+          'title="Save this team\'s page as a file that opens without a connection">' +
+          '<i class="fa fa-download" aria-hidden="true"></i> Download for offline</button>' +
+        '<a class="btn btn-outline-secondary btn-sm" href="/share.html?team=' + team + '" ' +
+          'title="Make a share code for someone not on a team here">' +
+          '<i class="fa fa-share-alt" aria-hidden="true"></i> Share</a>';
+    }
+    // Offline copy of the open team (js/offline.js). Leaves out the controls and the back link.
+    $("detail").addEventListener("click", function (e) {
+      var btn = e.target.closest("[data-offline-team]");
+      if (!btn) return;
+      var team = Number(btn.dataset.offlineTeam), name = RSTeams.name(teamInfoByNumber[team]);
+      RSOffline.fromButton(btn, function () {
+        return RSOffline.snapshot($("detail"), {
+          title: "Team " + team + (name ? " " + name : ""), file: "team-" + team,
+          remove: [".alliance-actions", ".back-to-rank"]
+        });
+      });
+    });
+    $("detail").addEventListener("click", function (e) {
+      var btn = e.target.closest("[data-alliance]");
+      if (!btn || selected == null) return;
+      var color = btn.dataset.alliance;
+      if (Alliance.colorOf(selected) === color) Alliance.remove(selected);
+      else Alliance.add(color, selected);
+      $("allianceActions").innerHTML = allianceActionsHtml(selected);
+    });
+
+    // ── Trend charts ─────────────────────────────────────────────────
+    // One series per chart, so each has its own axis (never two scales on one chart). Points
+    // are in date and match order; the dashed line is the average. Explained on ratings.html.
+    function lineChartHtml(title, points, unit) {
+      if (points.length < 2) return "";
+      var W = 640, H = 170, L = 38, Rm = 10, T = 12, B = 24;
+      var vals = points.map(function (p) { return p.v; });
+      var top = Math.max.apply(null, vals), avg = mean(vals);
+      var step = Math.pow(10, Math.floor(Math.log10(Math.max(top, 1)))) / 2 || 1;
+      var yMax = Math.max(step, Math.ceil(top / step) * step);
+      if (yMax / step > 6) { step *= 2; yMax = Math.ceil(top / step) * step; }
+      var x = function (i) { return L + (W - L - Rm) * (points.length === 1 ? .5 : i / (points.length - 1)); };
+      var y = function (v) { return T + (H - T - B) * (1 - v / yMax); };
+      var grid = "";
+      for (var g = 0; g <= yMax + 1e-9; g += step) {
+        grid += '<line x1="' + L + '" x2="' + (W - Rm) + '" y1="' + y(g) + '" y2="' + y(g) + '" class="tc-grid"/>' +
+          '<text x="' + (L - 6) + '" y="' + (y(g) + 4) + '" class="tc-axis" text-anchor="end">' + Math.round(g) + "</text>";
+      }
+      var path = points.map(function (p, i) { return (i ? "L" : "M") + x(i).toFixed(1) + " " + y(p.v).toFixed(1); }).join(" ");
+      var dots = points.map(function (p, i) {
+        var tip = p.label + ": " + (Math.round(p.v * 10) / 10) + " " + unit;
+        return '<g class="tc-pt" tabindex="0" data-tip="' + esc(tip) + '"><circle class="tc-hit" cx="' + x(i) + '" cy="' + y(p.v) + '" r="11"/>' +
+          '<circle class="tc-dot" cx="' + x(i) + '" cy="' + y(p.v) + '" r="4"/><title>' + esc(tip) + "</title></g>";
+      }).join("");
+      return '<figure class="trend-chart"><figcaption>' + esc(title) + ' <span class="text-muted">· average ' + avg.toFixed(1) + "</span></figcaption>" +
+        '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="' + esc(title + ", " + points.length + " points, average " + avg.toFixed(1)) + '">' + grid +
+        '<line x1="' + L + '" x2="' + (W - Rm) + '" y1="' + y(avg) + '" y2="' + y(avg) + '" class="tc-avg"/>' +
+        '<path d="' + path + '" class="tc-line"/>' + dots +
+        '<text x="' + L + '" y="' + (H - 6) + '" class="tc-axis">' + esc(points[0].label) + "</text>" +
+        '<text x="' + (W - Rm) + '" y="' + (H - 6) + '" class="tc-axis" text-anchor="end">' + esc(points[points.length - 1].label) + "</text>" +
+        '</svg><div class="tc-tip" hidden></div></figure>';
+    }
+    function trendsHtml(team, matches, officialRows, opr) {
+      // Scouted points per match, averaging two scouts on one match (as the rating does)
+      var byMatch = {}, order = [];
+      seasonRows(matches).forEach(function (m) {
+        if (m.match_number == null) return;
+        var k = m.event_id + "|" + m.match_number;
+        if (!byMatch[k]) { byMatch[k] = []; order.push(m); }
+        byMatch[k].push(m);
+      });
+      var scouted = order.map(function (m) {
+        return { label: evName(m.event_id).slice(0, 18) + " Q" + m.match_number, v: mean(RSRatings.pointsPerMatch(byMatch[m.event_id + "|" + m.match_number])) };
+      });
+      var officialPts = playedMatches(officialRows || []).map(function (r) {
+        return { label: evName(r.event_id).slice(0, 18) + " " + matchLabel(r), v: r.alliance_score };
+      });
+      var oprPts = (opr || []).filter(function (e) { return e.result.teams[team] && e.result.teams[team].score != null; })
+        .map(function (e) { return { label: evName(e.event_id).slice(0, 24), v: e.result.teams[team].score }; });
+      var html = lineChartHtml("Scouted points per match", scouted, "pts") +
+        lineChartHtml("Official alliance score per match", officialPts, "pts") +
+        lineChartHtml("OPR by event", oprPts, "pts added");
+      return html ? '<h3 class="section-title">Trends</h3><div class="trend-grid">' + html + "</div>" : "";
+    }
+    // Hover and focus show the point's value above the chart
+    function showTip(e) {
+      var pt = e.target.closest && e.target.closest(".tc-pt");
+      var fig = pt && pt.closest(".trend-chart");
+      document.querySelectorAll(".tc-tip").forEach(function (t) { if (!fig || t.parentNode !== fig) t.hidden = true; });
+      if (!pt) return;
+      var tip = fig.querySelector(".tc-tip"), box = fig.getBoundingClientRect(), dot = pt.getBoundingClientRect();
+      tip.textContent = pt.dataset.tip;
+      tip.hidden = false;
+      tip.style.left = Math.max(0, Math.min(box.width - tip.offsetWidth, dot.left - box.left + dot.width / 2 - tip.offsetWidth / 2)) + "px";
+      tip.style.top = Math.max(0, dot.top - box.top - tip.offsetHeight - 4) + "px";
+    }
+    $("detail").addEventListener("mouseover", showTip);
+    $("detail").addEventListener("focusin", showTip);
+    $("detail").addEventListener("mouseleave", function () { document.querySelectorAll(".tc-tip").forEach(function (t) { t.hidden = true; }); });
+
+    // ── Notes ────────────────────────────────────────────────────────
+    // Every free-text answer for the team (match notes, pit notes, auto routine...), newest first
+    function notesHtml(matches, pits) {
+      var text = fields.filter(function (f) { return f.field_type === "text"; });
+      var list = [];
+      matches.forEach(function (m) {
+        text.filter(function (f) { return (f.scope || "match") === "match"; }).forEach(function (f) {
+          var v = m.data && m.data[f.key];
+          if (v) list.push({ t: evTime(m.event_id), n: m.match_number || 0, where: evName(m.event_id) + (m.match_number ? " · Qual " + m.match_number : ""), what: f.label, v: v });
+        });
+      });
+      pits.forEach(function (p) {
+        text.filter(function (f) { return f.scope === "pit"; }).forEach(function (f) {
+          var v = p.data && p.data[f.key];
+          if (v) list.push({ t: evTime(p.event_id), n: 1e4, where: evName(p.event_id) + " · Pit", what: f.label, v: v });
+        });
+      });
+      if (!list.length) return "";
+      list.sort(function (a, b) { return (b.t - a.t) || (b.n - a.n); });
+      return '<h3 class="section-title">Notes<span class="src-badge scout">Scouted</span></h3>' +
+        '<input type="search" class="form-control form-control-sm notes-search" placeholder="Search ' + list.length + ' notes" aria-label="Search notes">' +
+        '<ul class="notes-list">' + list.map(function (n) {
+          return '<li><span class="text-muted">' + esc(n.where) + " · " + esc(n.what) + "</span><br>" + esc(n.v) + "</li>";
+        }).join("") + "</ul>";
+    }
+    $("detail").addEventListener("input", function (e) {
+      if (!e.target.classList.contains("notes-search")) return;
+      var q = e.target.value.trim().toLowerCase();
+      e.target.nextElementSibling.querySelectorAll("li").forEach(function (li) {
+        li.hidden = q && li.textContent.toLowerCase().indexOf(q) === -1;
+      });
+    });
+
+    // ── CSV export ───────────────────────────────────────────────────
+    // The data on screen as spreadsheet files. Row security already limits what was loaded.
+    // Who scouted an entry isn't included.
+    function csvCell(v) {
+      if (v == null) return "";
+      var s = typeof v === "object" ? JSON.stringify(v) : String(v);
+      if (/^[=+\-@]/.test(s)) s = "'" + s;   // keep a spreadsheet from running it as a formula
+      return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    }
+    function downloadCsv(name, header, rows) {
+      var text = [header].concat(rows).map(function (r) { return r.map(csvCell).join(","); }).join("\r\n");
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob(["﻿" + text], { type: "text/csv;charset=utf-8" }));
+      a.download = name.replace(/[^a-z0-9-]+/gi, "-").toLowerCase() + ".csv";
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    }
+    function fieldColumns(scope, rows) {
+      var keys = fieldsFor(scope).map(function (f) { return f.key; });
+      rows.forEach(function (r) { Object.keys(r.data || {}).forEach(function (k) { if (keys.indexOf(k) === -1) keys.push(k); }); });
+      return keys;
+    }
+    function exportMatches(name, rows) {
+      var keys = fieldColumns("match", rows);
+      downloadCsv(name, ["event", "event_date", "team", "match"].concat(keys).concat(["prefilled_from_vision", "saved_at"]),
+        rows.map(function (m) {
+          var ev = eventsById[m.event_id] || {};
+          return [ev.name, ev.event_date, m.team_number, m.match_number].concat(keys.map(function (k) { return (m.data || {})[k]; }))
+            .concat([(m.prefilled || []).join(" "), m.created_at]);
+        }));
+    }
+    var lastDetail = null;   // what the open team card was drawn from, for its export buttons
+    $("detail").addEventListener("click", async function (e) {
+      var btn = e.target.closest("[data-export]");
+      if (!btn) return;
+      var kind = btn.dataset.export;
+      if (kind === "event") {
+        btn.disabled = true;
+        var id = btn.dataset.event;
+        var r = await RSRatings.pagedRows(function () { return sb.from("scouting_entries").select("*").eq("event_id", id).order("id"); });
+        btn.disabled = false;
+        if (r.error) { RSDialog.alert("Couldn't load the entries: " + r.error.message, { title: "Export failed" }); return; }
+        exportMatches(evName(id) + " scouting", r.data);
+        return;
+      }
+      if (!lastDetail) return;
+      var d = lastDetail, base = "team-" + d.team;
+      if (kind === "matches") exportMatches(base + " scouting", d.matches);
+      if (kind === "pit") {
+        var keys = fieldColumns("pit", d.pits);
+        downloadCsv(base + " pit", ["event", "team", "updated_at"].concat(keys), d.pits.map(function (p) {
+          return [evName(p.event_id), p.team_number, p.updated_at].concat(keys.map(function (k) { return (p.data || {})[k]; }));
+        }));
+      }
+      if (kind === "official") {
+        downloadCsv(base + " official", ["event", "match", "level", "alliance", "station", "alliance_score", "opponent_score", "played_at", "breakdown"],
+          d.officialRows.map(function (r) {
+            return [evName(r.event_id), r.match_key, r.comp_level, r.alliance, r.station, r.alliance_score, r.opponent_score, r.played_at, r.breakdown];
+          }));
+      }
+    });
+    function exportButtonsHtml() {
+      return '<div class="dropdown d-inline-block"><button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">' +
+        '<i class="fa fa-table" aria-hidden="true"></i> Export CSV</button><div class="dropdown-menu">' +
+        '<button type="button" class="dropdown-item" data-export="matches">Scouted matches</button>' +
+        '<button type="button" class="dropdown-item" data-export="pit">Pit entries</button>' +
+        '<button type="button" class="dropdown-item" data-export="official">Official results</button></div></div>';
+    }
+
+    function renderDetail(team, gScout, gOff, matches, pits, officialRows, officialErr, lineups, failed, extra) {
+      extra = extra || { vision: [], opr: [] };
+      var mFields = fieldsFor("match"), pFields = fieldsFor("pit");
+      var pit = pits[0] || null;   // newest first
+
+      matches = matches.slice().sort(function (a, b) {
+        return (evTime(a.event_id) - evTime(b.event_id)) || ((a.match_number || 0) - (b.match_number || 0));
+      });
+
+      // Data-coverage counters first, so it's obvious at a glance how much of each kind of data
+      // this team has, and that "overlap" (counted by both) isn't hiding inside either number.
+      var counts = dataCounts.find(function (r) { return r.team_number === team; }) ||
+        { scouted_matches: 0, official_matches: 0, overlap_matches: 0 };
+      var tiles = [
+        ["Scouted matches", counts.scouted_matches],
+        ["Official matches", counts.official_matches],
+        ["Overlap (both)", counts.overlap_matches],
+        ["Avg pts / match (scouted)", gScout.avg == null ? "—" : gScout.avg],
+        ["Avg alliance score (official)", gOff.avg == null ? "—" : gOff.avg],
+        ["Win % (official)", officialErr ? "—" : winPct(playedMatches(officialRows || []))]
+      ];
+      mFields.filter(function (f) { return f.field_type === "boolean"; }).forEach(function (f) {
+        var known = matches.filter(function (m) { return m.data && m.data[f.key] != null; });
+        if (!known.length) return;
+        var yes = known.filter(function (m) { return m.data[f.key] === true; }).length;
+        tiles.push([f.label, Math.round(100 * yes / known.length) + "%"]);
+      });
+
+      var basisScout = basisText("Scouting", "avg " + gScout.avg + " pts", gScout);
+      var basisOff = basisText("Official", "adds about " + gOff.opr + " pts per match (OPR)", gOff);
+
+      // Robot parameters from the latest pit entry
+      var paramsHtml;
+      if (!pit) {
+        paramsHtml = '<p class="text-muted">No pit data yet.</p>';
+      } else {
+        var rows = pFields.map(function (f) {
+          var v = pit.data ? pit.data[f.key] : null;
+          var unsure = f.allow_unsure && pit.data && pit.data[f.key + "__unsure"];
+          if ((v == null || v === "") && !unsure) return "";
+          return "<dt>" + esc(f.label) + "</dt><dd>" + cell(v, f, pit.data) + "</dd>";
+        }).join("");
+        paramsHtml = (rows
+            ? '<dl class="info-grid">' + rows + "</dl>"
+            : '<p class="text-muted">Pit entry has no values filled in.</p>') +
+          '<p class="text-muted mt-2 mb-0" style="font-size:.8rem;">Last pit scouted at ' +
+          esc(evName(pit.event_id)) + " · " + fmtDate(pit.updated_at) + "</p>";
+      }
+
+      // Match history: one row per match, every match field as a column
+      var matchCols = ["Event", "Level", "Match", ""].concat(mFields.map(function (f) { return f.label; }));
+      var matchRows = matches.map(function (m) {
+        var lineup = m.match_number ? lineups[m.event_id + "|qm" + m.match_number] : null;
+        return "<tr><td>" + esc(evName(m.event_id)) + "</td><td>" + tierTag(m.event_id) + "</td><td>" + (m.match_number || "—") + "</td><td>" + allianceViewLink(lineup) + "</td>" +
+          mFields.map(function (f) { return "<td>" + cell(m.data ? m.data[f.key] : null, f, m.data) + "</td>"; }).join("") +
+          "</tr>";
+      }).join("");
+
+      lastDetail = { team: team, matches: matches, pits: pits, officialRows: officialRows || [] };
+      var info = teamInfoByNumber[team];
+      var logoHtml = RSTeams.logo(info) ? '<img class="team-logo" src="' + esc(RSTeams.logo(info)) + '" alt="">' : "";
+      var scoutedTiles = scoutedInsightTiles(matches);
+
+      $("detail").innerHTML = backToRankHtml() +
+        (failed
+          ? '<div class="alert alert-warning" role="alert" style="font-size:.9rem;">Some of this team\'s data couldn\'t be loaded, so blank stats and grades may be wrong. Try refreshing the page.</div>'
+          : "") +
+        '<div class="rating-group">' + ratingBox("Scouting", gScout) + ratingBox("Official", gOff) + '</div>' +
+        '<div class="detail-head">' +
+          logoHtml +
+          '<div>' +
+            "<h2>" + team + (RSTeams.name(info) ? ' <small class="text-muted">' + esc(RSTeams.name(info)) + '</small>' : "") + "</h2>" +
+            '<p class="text-muted mb-0" style="font-size:.92rem;">' + esc(basisScout) + "</p>" +
+            '<p class="text-muted mb-0" style="font-size:.92rem;">' + esc(basisOff) + "</p>" +
+          '</div>' +
+        "</div>" +
+        '<div class="alliance-actions" id="allianceActions">' + allianceActionsHtml(team) + "</div>" +
+
+        tileGrid(tiles) +
+
+        (scoutedTiles.length
+          ? '<h3 class="section-title">Scouted insights<span class="src-badge scout">Scouted</span></h3>' + tileGrid(scoutedTiles)
+          : "") +
+        trendsHtml(team, matches, officialRows, extra.opr) +
+        scoutedStatsHtml(matches, mFields) +
+        scoutedByEventHtml(matches, mFields) +
+        ratingBreakdownHtml(team) +
+
+        '<h3 class="section-title">Robot parameters<span class="src-badge scout">Scouted</span></h3>' + paramsHtml +
+        pitHistoryHtml(pits, pFields) +
+
+        officialHtml(officialRows || [], officialErr, team, lineups, extra.opr) +
+        visionHtml(extra.vision) +
+        '<h3 class="section-title">Match history<span class="src-badge scout">Scouted</span></h3>' +
+        (matches.length
+          ? '<div class="table-responsive"><table data-sortable="q-scouted" class="table match-table"><thead><tr>' +
+              matchCols.map(function (c) { return "<th>" + esc(c) + "</th>"; }).join("") +
+            "</tr></thead><tbody>" + matchRows + "</tbody></table></div>"
+          : '<p class="text-muted">No match data yet.</p>') +
+        notesHtml(matches, pits);
+    }
+
+    // ── Event rankings ───────────────────────────────────────────────
+    // Qualification standings for one event, worked out from the synced official matches (FRC
+    // Events doesn't send its ranking table through the sync). Ranked by average ranking points
+    // when every played match reports them, else by record; then by average alliance score.
+    // Explained on ratings.html#event-rankings, which must change with this code.
+    var OUR_TEAM = MY_TEAM;
+    var eventTeams = null;     // Set of teams on the picked event's schedule, or null for all events
+    var eventRank = null;      // { eventId, rows, hasRp, played, scheduled, err } for the picked event
+    var rankLoadId = 0;        // ignores a slow load once a different event is picked
+
+    function fillEventSelect() {
+      var ids = Object.keys(eventsById).sort(function (a, b) {
+        return (evTime(b) - evTime(a)) || evName(a).localeCompare(evName(b));
+      });
+      $("eventSel").innerHTML = '<option value="">Event: All events</option>' + ids.map(function (id) {
+        var e = eventsById[id];
+        return '<option value="' + esc(id) + '">' + esc(e.name) + (e.event_date ? " (" + fmtEventDate(e.event_date, { year: "numeric", month: "short" }) + ")" : "") + "</option>";
+      }).join("");
+    }
+
+    function computeStandings(matches) {
+      var byTeam = {}, played = 0, hasRp = true;
+      function team(t) {
+        return byTeam[t] || (byTeam[t] = { team: t, played: 0, w: 0, l: 0, t: 0, rp: 0, score: 0, margin: 0, left: 0 });
+      }
+      matches.forEach(function (m) {
+        var done = m.red_score != null && m.blue_score != null;
+        if (done) played++;
+        [["red", m.red_teams, m.red_score, m.blue_score, m.red_breakdown],
+         ["blue", m.blue_teams, m.blue_score, m.red_score, m.blue_breakdown]].forEach(function (s) {
+          var rp = s[4] && typeof s[4].rp === "number" ? s[4].rp : null;
+          if (done && rp == null) hasRp = false;
+          (s[1] || []).forEach(function (t) {
+            if (t == null) return;
+            var r = team(t);
+            if (!done) { r.left++; return; }
+            r.played++;
+            r.score += s[2];
+            r.margin += s[2] - s[3];
+            if (s[2] > s[3]) r.w++; else if (s[2] < s[3]) r.l++; else r.t++;
+            if (rp != null) r.rp += rp;
+          });
+        });
+      });
+      if (!played) hasRp = false;
+      var rows = Object.keys(byTeam).map(function (k) {
+        var r = byTeam[k];
+        r.rpAvg = r.played ? r.rp / r.played : null;
+        r.recordPct = r.played ? (r.w + r.t / 2) / r.played : null;
+        r.avgScore = r.played ? r.score / r.played : null;
+        r.avgMargin = r.played ? r.margin / r.played : null;
+        return r;
+      });
+      var key = hasRp ? "rpAvg" : "recordPct";
+      rows.sort(function (a, b) {
+        if (!a.played || !b.played) return (b.played ? 1 : 0) - (a.played ? 1 : 0) || a.team - b.team;
+        return (b[key] - a[key]) || (b.avgScore - a.avgScore) || (a.team - b.team);
+      });
+      var n = 0;
+      rows.forEach(function (r) { r.rank = r.played ? ++n : null; });
+      return { rows: rows, hasRp: hasRp, played: played, scheduled: matches.length };
+    }
+
+    async function loadEventRanking(eventId) {
+      var id = ++rankLoadId;
+      if (selected == null) $("detail").innerHTML = '<div class="loading-msg">Loading event rankings…</div>';
+      var res = await Promise.all([
+        allRows(function () {
+          return sb.from("official_matches_combined")
+            .select("match_key,red_teams,blue_teams,red_score,blue_score,red_breakdown,blue_breakdown")
+            .eq("event_id", eventId).eq("comp_level", "qm").order("match_key");
+        }),
+        allRows(function () {
+          return sb.from("scouting_entries").select("team_number").eq("event_id", eventId).order("id");
+        })
+      ]);
+      if (id !== rankLoadId) return;
+      var st = computeStandings(res[0].data || []);
+      var scouted = {};
+      (res[1].data || []).forEach(function (r) { scouted[r.team_number] = (scouted[r.team_number] || 0) + 1; });
+      st.rows.forEach(function (r) { r.scouted = scouted[r.team] || 0; });
+      st.opr = RSOpr.compute(res[0].data || []);
+      st.eventId = eventId;
+      st.err = res[0].error || null;
+      if (res[1].error) console.warn("Scouted counts unavailable:", res[1].error.message);
+      eventRank = st;
+      // Teams scouted here but missing from the official schedule still belong in the list
+      eventTeams = new Set(st.rows.map(function (r) { return r.team; }).concat(Object.keys(scouted).map(Number)));
+      renderList();
+      if (selected == null) renderRanking();
+    }
+
+    function renderRanking() {
+      var st = eventRank;
+      if (!st) return;
+      var head = '<h2 class="mb-1">' + esc(evName(st.eventId)) + " " + tierTag(st.eventId) + "</h2>" +
+        '<button type="button" class="btn btn-outline-secondary btn-sm" data-export="event" data-event="' + esc(st.eventId) + '">' +
+          '<i class="fa fa-table" aria-hidden="true"></i> Export this event\'s scouting (CSV)</button>' +
+        '<h3 class="section-title mt-2">Event rankings<span class="src-badge api">API</span></h3>';
+      if (st.err) { $("detail").innerHTML = head + accessNotice(st.err, "official match data"); return; }
+      if (!st.rows.length) {
+        $("detail").innerHTML = head + '<p class="text-muted">No official qualification schedule for this event yet. ' +
+          "Link the event to its FRC / TBA codes in the Staff Portal, then resync.</p>";
+        return;
+      }
+      var f1 = function (v) { return v == null ? "—" : v.toFixed(1); };
+      var f2 = function (v) { return v == null ? "—" : v.toFixed(2); };
+      var body = st.rows.map(function (r) {
+        var info = teamInfoByNumber[r.team];
+        var opr = st.opr.teams[r.team] ? st.opr.teams[r.team].score : null;
+        var oprRank = RSOpr.rankOf(st.opr, r.team, null);
+        return '<tr data-team="' + r.team + '" tabindex="0"' + (r.team === OUR_TEAM ? ' class="is-us"' : "") + ">" +
+          '<td class="rank-n">' + (r.rank || "—") + "</td>" +
+          "<td><strong>" + r.team + "</strong>" + (RSTeams.name(info) ? ' <span class="text-muted">' + esc(RSTeams.name(info)) + "</span>" : "") + "</td>" +
+          (st.hasRp ? "<td>" + f2(r.rpAvg) + "</td><td>" + (r.played ? r.rp : "—") + "</td>" : "") +
+          "<td>" + r.w + "-" + r.l + "-" + r.t + "</td>" +
+          "<td>" + r.played + (r.left ? ' <span class="text-muted">(+' + r.left + ")</span>" : "") + "</td>" +
+          "<td>" + f1(r.avgScore) + "</td><td>" + (r.avgMargin == null ? "—" : signed(r.avgMargin)) + "</td>" +
+          "<td>" + f1(opr) + (oprRank ? ' <span class="text-muted" style="font-size:.85em;">(#' + oprRank.rank + ")</span>" : "") + "</td>" +
+          "<td>" + r.scouted + "</td></tr>";
+      }).join("");
+      $("detail").innerHTML = head +
+        '<p class="text-muted mb-2" style="font-size:.9rem;">' + st.played + " of " + st.scheduled + " qualification matches played · " +
+          st.rows.length + " teams · " + (st.hasRp ? "ranked by average ranking points" : "ranked by record (ranking points aren't in the synced data)") +
+          ", then average alliance score</p>" +
+        '<div class="table-responsive"><table data-sortable="q-rank" class="table match-table rank-table"><thead><tr>' +
+          "<th>Rank</th><th>Team</th>" + (st.hasRp ? "<th>Avg RP</th><th>Total RP</th>" : "") +
+          "<th>W-L-T</th><th>Played</th><th>Avg score</th><th>Avg margin</th><th>OPR (rank)</th><th>Scouted</th>" +
+        "</tr></thead><tbody>" + body + "</tbody></table></div>" +
+        '<p class="insight-note mb-3">Worked out from the synced qualification matches, so it can differ from the official ' +
+          "table on close tiebreakers, surrogate matches or disqualifications. Played shows matches still to come in brackets. " +
+          'Click a team to open it. <a href="/ratings.html#event-rankings">How event rankings work</a></p>';
+    }
+
+    function backToRankHtml() {
+      return eventRank ? '<a href="#" class="back-to-rank" data-back-rank><i class="fa fa-arrow-left" aria-hidden="true"></i> ' +
+        esc(evName(eventRank.eventId)) + " rankings</a>" : "";
+    }
+    function showRanking() {
+      selected = null;
+      renderList();
+      renderRanking();
+    }
+    $("detail").addEventListener("click", function (e) {
+      if (e.target.closest("[data-back-rank]")) { e.preventDefault(); showRanking(); return; }
+      var row = e.target.closest(".rank-table tr[data-team]");
+      if (row) openTeam(parseInt(row.dataset.team, 10));
+    });
+    $("detail").addEventListener("keydown", function (e) {
+      var row = e.target.closest(".rank-table tr[data-team]");
+      if (!row || (e.key !== "Enter" && e.key !== " ")) return;
+      e.preventDefault();
+      openTeam(parseInt(row.dataset.team, 10));
+    });
+    // Picking an event shows its rankings and narrows the list; ?event=<id> keeps it on reload
+    function pickEvent(id) {
+      var url = new URL(location.href);
+      if (id) url.searchParams.set("event", id); else url.searchParams.delete("event");
+      history.replaceState(null, "", url);
+      selected = null;
+      if (!id) {
+        rankLoadId++;
+        eventRank = null; eventTeams = null;
+        renderList();
+        $("detail").innerHTML = '<div class="empty-detail">Select a team from the list, or pick an event to see its rankings.</div>';
+        return;
+      }
+      return loadEventRanking(id);
+    }
+    $("eventSel").addEventListener("change", function () { pickEvent($("eventSel").value); });
+
+    // ── Boot ─────────────────────────────────────────────────────────
+    // Everything at once: each request only waits on the network, not on the others
+    await Promise.all([loadMeta().then(fillEventSelect), loadLists(), loadTestTeams(), loadTeamInfo()]);
+    renderList();
+    // Names from TBA for teams that don't have one yet
+    if (await RSTeams.fillMissing(sb, teamList().map(function (r) { return r.team; }), teamInfoByNumber)) renderList();
+    // After a resync, refetch the official lists and the open team
+    RSResync.mount($("resyncSlot"), async function () {
+      await loadLists();
+      renderList();
+      if (eventRank) await loadEventRanking(eventRank.eventId);
+      if (selected != null) await openTeam(selected);
+    });
+    // query.html?event=<id> opens that event's rankings; ?team=1307 opens a team (e.g. from Match Flags)
+    var params = new URLSearchParams(location.search);
+    var linkEvent = params.get("event");
+    if (linkEvent && eventsById[linkEvent]) {
+      $("eventSel").value = linkEvent;
+      await loadEventRanking(linkEvent);
+    }
+    var linkTeam = Number(params.get("team"));
+    if (Number.isInteger(linkTeam) && linkTeam >= 1 && linkTeam <= 99999) openTeam(linkTeam);
+
+    // event_date has no time zone. Format it in UTC so it doesn't shift to the previous day.
+    function fmtEventDate(d, opts) {
+     if (!d) return "—";
+     return new Date(String(d).slice(0, 10) + "T00:00:00Z")
+      .toLocaleDateString("en-US", Object.assign({ timeZone: "UTC" }, opts));
+    }
+
+    /* ─────────────────────────────────────────────────────────────────
+       BLUE ALLIANCE IMPORT: NOT ACTIVE YET (kept here for later)
+
+       Plan:
+       - A Supabase Edge Function ("tba-sync") holds the TBA API key on the
+         server and fetches /api/v3/team/frc{number}/matches/{year}/simple.
+       - Only teams whose state_prov is in NE_STATES get imported.
+       - Imported matches are tagged source = 'tba' so the match table and the
+         rating can show which numbers came from scouting and which from TBA.
+       - Before enabling, add a `source` column to scouting_entries and make
+         team_points_summary() count TBA rows the same way as scouted rows.
+
+       To enable: uncomment this block, deploy the function, and call
+       loadTbaMatches() from openTeam().
+    ───────────────────────────────────────────────────────────────── */
+    // var CFG = window.AUTH_CONFIG;
+    // var NE_STATES = ["NH", "ME", "VT", "MA", "RI", "CT"];
+    //
+    // async function loadTbaMatches(team) {
+    //   var r = await fetch(CFG.url + "/functions/v1/tba-sync?team=" + team, {
+    //     headers: { Authorization: "Bearer " + CFG.anonKey }
+    //   });
+    //   if (!r.ok) return [];
+    //   // Expected shape: [{ event_id, match_number, data, source: "tba" }]
+    //   return r.json();
+    // }
+  })();
+  </script>
+</body>
+</html>

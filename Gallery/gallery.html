@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+<script>window.RS_BUILD = {"version":"0.0.5+7eca554","channel":"experimental","commit":"7eca554","site":"beta"};</script>
+<link rel="icon" href="/img/robosaintslogo.png">
+<!-- 1307scout app (PWA): see /js/pwa.js and /sw.js -->
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#0A2352">
+<link rel="apple-touch-icon" href="/img/app/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="1307scout β">
+
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <title>Gallery</title>
+
+    <!-- Bootstrap core CSS -->
+    <!-- Open connections early to the hosts this page needs before it can draw or load data -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="preconnect" href="https://nyanwljgsazwuzmnlrcz.supabase.co" crossorigin>
+    <!-- Light/dark theme, before the stylesheets so a dark page never flashes white -->
+    <script src="/js/theme.js"></script>
+    <link href="/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+
+    <!-- Custom styles for this template -->
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="/css/modern.css" rel="stylesheet"> <!-- New/refreshed style -->
+    <link href="css/gallery.css" rel="stylesheet">
+
+  </head>
+
+  <body>
+
+    <!-- ===== Navigation ===== -->
+    <nav class="navbar fixed-top navbar-expand-lg navbar-dark bg-dark" id="navigation">
+      <div class="container">
+        <a class="navbar-brand" href="/index.html">
+          <img src="/img/robosaintslogo.png" data-dark-src="/img/robosaintslogo-dark.png" id="navbarlogo" alt="">
+          St. Thomas Aquinas Robotics Team 1307
+        </a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarResponsive"
+                aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarResponsive">
+          <ul class="navbar-nav ml-auto">
+            <li class="nav-item">
+              <a class="nav-link" href="/index.html">Home</a>
+            </li>
+
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle" href="#" id="navSponsors" role="button"
+                data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Sponsors</a>
+              <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navSponsors">
+                <a class="dropdown-item" href="/oursponsors.html">Our Sponsors</a>
+                <a class="dropdown-item" href="/business-plan.html">Business Plan</a>
+              </div>
+            </li>
+
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle" href="#" id="navAbout" role="button"
+                data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">About Us</a>
+              <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navAbout">
+                <a class="dropdown-item" href="/about-the-students.html">The Students</a>
+                <a class="dropdown-item" href="/about-the-mentors.html">The Mentors</a>
+                <a class="dropdown-item" href="/about-the-robot.html">The Robots</a>
+                <a class="dropdown-item" href="/results.html">Season Results</a>
+              </div>
+            </li>
+
+            <li class="nav-item">
+              <a class="nav-link" href="/Gallery/gallery.html">Picture Gallery</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/contact.html">Contact Us</a>
+            </li>
+
+            <!-- 1307scout command center. Items marked data-role are shown or hidden by auth.js -->
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle" href="#" id="navScout" role="button"
+                data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">1307scout</a>
+              <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navScout">
+                <a class="dropdown-item" href="/1307scout.html">1307scout Home</a>
+                <h6 class="dropdown-header" data-role="team" hidden>Data</h6>
+                <a class="dropdown-item" href="/live.html" data-role="team" hidden>Competition Day</a>
+                <a class="dropdown-item" href="/query.html" data-role="team" hidden>Team Database</a>
+                <a class="dropdown-item" href="/alliance.html" data-role="team" hidden>Alliance View</a>
+                <a class="dropdown-item" href="/scout.html" data-role="team" hidden>Scout</a>
+                <a class="dropdown-item" href="/flags.html" data-role="team" hidden>Match Flags</a>
+                <a class="dropdown-item" href="/playoffs.html" data-role="team" hidden>Playoff Selection</a>
+                <a class="dropdown-item" href="/bracket.html" data-role="team" hidden>Playoff Bracket</a>
+                <a class="dropdown-item" href="/share.html" data-role="team" hidden>Share Data</a>
+                <h6 class="dropdown-header" data-role="team" hidden>My Team</h6>
+                <a class="dropdown-item" href="/matches.html" data-role="team" hidden>Our Matches</a>
+                <a class="dropdown-item" href="/strategy.html" data-role="team" hidden>Match Strategy</a>
+                <a class="dropdown-item" href="/pitcrew.html" data-role="team" hidden>Pit Crew</a>
+                <a class="dropdown-item" href="/picklist.html" data-role="team" hidden>Pick List</a>
+                <a class="dropdown-item" href="/shifts.html" data-role="team" hidden>Scout Shifts</a>
+                <a class="dropdown-item" href="/team.html" data-role="team" hidden>Team Management</a>
+                <div class="dropdown-divider" data-role="staff" hidden></div>
+                <a class="dropdown-item" href="/portal.html" data-role="staff" hidden>Staff Portal</a>
+              </div>
+            </li>
+
+            <li class="nav-item" id="authNavItem">
+              <a class="nav-link" href="/signin.html">Sign In</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Page Content -->
+    <div class="container">
+
+      <h1 class="my-4 text-center text-lg-left">Gallery</h1>
+        <p class="my-4 text-center text-lg-left">Welcome to our photo gallery! Here you can find a collection of images from our team, competitions, and work sessions.</p>
+
+      <div class="row text-center text-lg-left" id="galleryGrid">
+        <!-- Thumbnails and full-image URLs are generated from this array by the script at the
+             bottom of the page. Add new photos there, not here. -->
+      </div>
+
+    </div>
+    <!-- /.container -->
+
+    <!-- Lightbox / carousel modal: clicking a thumbnail opens the full-size image here instead
+         of navigating away. -->
+    <div class="modal fade" id="galleryLightbox" tabindex="-1" role="dialog" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered gallery-lightbox-dialog" role="document">
+        <div class="modal-content gallery-lightbox-content">
+          <button type="button" class="close gallery-lightbox-close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+          <div id="galleryCarousel" class="carousel slide" data-interval="false">
+            <div class="carousel-inner" id="galleryCarouselInner">
+              <!-- Slides injected by script -->
+            </div>
+            <a class="carousel-control-prev" href="#galleryCarousel" role="button" data-slide="prev">
+              <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+              <span class="sr-only">Previous</span>
+            </a>
+            <a class="carousel-control-next" href="#galleryCarousel" role="button" data-slide="next">
+              <span class="carousel-control-next-icon" aria-hidden="true"></span>
+              <span class="sr-only">Next</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="py-5" id="bottomrow">
+      <a href="https://instagram.com/1307robosaints" class="fa fa-instagram" target="_blank" rel="noopener" aria-label="Instagram"></a>
+      <a href="https://www.youtube.com/@1307Robosaints" class="fa fa-youtube" target="_blank" rel="noopener" aria-label="YouTube"></a>
+      <a href="https://www.facebook.com/1307robosaints" class="fa fa-facebook" target="_blank" rel="noopener" aria-label="Facebook"></a>
+      <a href="https://www.tiktok.com/@1307.robotics" class="fa social-tt" target="_blank" rel="noopener" aria-label="TikTok">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path fill="currentColor" d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
+        </svg>
+      </a>
+      <div class="container">
+        <p class="m-0 text-center text-white">Copyright &copy; STA Robotics Team 2026</p>
+        <p class="m-0 mt-2 text-center" style="font-size:.78rem;">
+          Website and 1307scout service created and maintained by Daniel Lowry —
+          <a href="/contact.html" style="color:#fff;text-decoration:underline;">website support</a>
+        </p>
+        <p class="m-0 mt-2 text-center" style="font-size:.78rem;">
+          <a href="/privacy-policy.html" style="color:#fff;text-decoration:underline;">Privacy Policy</a>
+          &nbsp;&middot;&nbsp;
+          <a href="/terms-of-service.html" style="color:#fff;text-decoration:underline;">Terms of Service</a>
+        </p>
+      </div>
+    </footer>
+
+    <!-- Bootstrap core JavaScript -->
+    <script src="/vendor/jquery/jquery.min.js"></script>
+    <script src="/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Supabase Authentication -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" integrity="sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o" crossorigin="anonymous"></script>
+    <script src="/js/auth-config.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/pwa.js"></script>
+
+    <script>
+      // Add new photos here: { thumb: "small preview shown in the grid", full: "original/full-size image" }.
+      const GALLERY_PHOTOS = [
+        { thumb: "../img/thumbs/arenaimage.jpg", full: "../img/arenaimage.jpg" },
+        { thumb: "../img/thumbs/competitionimage.jpg", full: "../img/competitionimage.jpg" },
+        { thumb: "../img/thumbs/teamimage2.jpg", full: "../img/teamimage2.png" },
+        ...Array.from({ length: 35 }, (_, i) => ({
+          thumb: `../img/thumbs/PhotosAtWork/${i + 1}.jpg`,
+          full: `../img/PhotosAtWork/${i + 1}.jpg`,
+        })),
+      ];
+
+      const grid = document.getElementById("galleryGrid");
+      const carouselInner = document.getElementById("galleryCarouselInner");
+
+      GALLERY_PHOTOS.forEach((photo, index) => {
+        const col = document.createElement("div");
+        col.className = "col-lg-3 col-md-4 col-6";
+        col.innerHTML = `
+          <a href="#" class="d-block mb-4 h-100 gallery-thumb-link" data-index="${index}">
+            <img class="img-fluid img-thumbnail" src="${photo.thumb}" loading="lazy" alt="">
+          </a>`;
+        grid.appendChild(col);
+
+        const slide = document.createElement("div");
+        slide.className = "carousel-item" + (index === 0 ? " active" : "");
+        slide.innerHTML = `<img data-thumb="${photo.thumb}" data-full="${photo.full}" alt="">`;
+        carouselInner.appendChild(slide);
+      });
+
+      const lightbox = document.getElementById("galleryLightbox");
+      const carousel = $("#galleryCarousel");
+
+      // Shows the thumbnail right away (the grid already loaded it), then swaps in the full photo
+      // once it arrives, since some are over 10 MB. Keep slide images free of a src="" attribute:
+      // browsers report an empty src as the page's own URL, so it can't mean "not loaded yet".
+      function loadSlideImage(index) {
+        const img = carouselInner.children[index].querySelector("img");
+        if (img.hasAttribute("src")) return;
+        img.src = img.dataset.thumb;
+        const full = new Image();
+        full.onload = () => { img.src = full.src; };
+        full.src = img.dataset.full;
+      }
+
+      grid.addEventListener("click", (e) => {
+        const link = e.target.closest(".gallery-thumb-link");
+        if (!link) return;
+        e.preventDefault();
+        const index = Number(link.dataset.index);
+        carousel.carousel(index);
+        loadSlideImage(index);
+        $(lightbox).modal("show");
+      });
+
+      // Preload the image for whichever slide the carousel is about to show.
+      carousel.on("slide.bs.carousel", (e) => loadSlideImage(e.to));
+    </script>
+
+  </body>
+
+</html>

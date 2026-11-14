@@ -1,0 +1,2306 @@
+<!DOCTYPE html>
+<!-- =========================================================================================================
+     scout.html  –  where scouting data is entered.
+     Two views, chosen by the script at the bottom based on the person's access level:
+       #teamView   staff + students: pick an event, then enter Match or Pit data and see recent entries
+       #guestView  everyone else: type or scan a share code to read a limited slice of data
+     The form fields are not hard-coded. They come from the scout_fields table (staff edit them in the portal),
+     and each field has a "scope" of match or pit that decides which tab it appears on.
+     ========================================================================================================= -->
+<html lang="en">
+<head>
+<script>window.RS_BUILD = {"version":"0.0.5+7eca554","channel":"experimental","commit":"7eca554","site":"beta"};</script>
+  <link rel="icon" href="/img/robosaintslogo.png">
+  <!-- 1307scout app (PWA): see /js/pwa.js and /sw.js -->
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#0A2352">
+  <link rel="apple-touch-icon" href="/img/app/apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="1307scout β">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <title>Scout – 1307scout</title>
+
+  <!-- Styles: Bootstrap, Font Awesome icons, site fonts, then the site theme (modern.css loads last so it wins) -->
+  <!-- Open connections early to the hosts this page needs before it can draw or load data -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="preconnect" href="https://nyanwljgsazwuzmnlrcz.supabase.co" crossorigin>
+  <!-- Light/dark theme, before the stylesheets so a dark page never flashes white -->
+  <script src="/js/theme.js"></script>
+  <link href="/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="/css/modern.css" rel="stylesheet">
+  <style>
+    .scout-wrap { max-width: 720px; margin: 0 auto; }
+
+    /* White card that holds the entry form */
+    .entry-form-card {
+      background: var(--white);
+      border: 1px solid var(--line);
+      border-top: 3px solid var(--blue);
+      padding: 1.75rem;
+      margin-bottom: 2rem;
+    }
+
+    /* Mode tabs: Match / Pit */
+    .scout-tabs { display: flex; border-bottom: 1px solid var(--line); margin-bottom: 1.25rem; }
+    .scout-tab {
+      flex: 1; background: none; border: 0; border-bottom: 3px solid transparent;
+      padding: .7rem; font-family: var(--display); font-weight: 600;
+      color: var(--muted); cursor: pointer;
+    }
+    .scout-tab.active { color: var(--heading); border-bottom-color: var(--blue); }
+
+    /* Section headings inside the dynamic form (Autonomous, Teleop, Endgame, ...) — a colored
+       tab instead of a thin gray rule, so a scout can tell at a glance where one group of
+       fields ends and the next starts without reading every label. */
+    .field-section-heading {
+      font-family: var(--display);
+      font-size: .9rem;
+      font-weight: 700;
+      letter-spacing: .05em;
+      color: var(--heading);
+      text-transform: uppercase;
+      background: var(--tint);
+      border-left: 4px solid var(--blue);
+      padding: .5rem .75rem;
+      margin: 1.5rem 0 1rem;
+    }
+    .field-section-heading:first-child { margin-top: 0; }
+
+    /* Required/optional labeling on dynamic fields */
+    .field-optional { font-weight: 400; color: var(--muted); font-size: .85em; }
+    .field-required { color: var(--red); }
+
+    /* Regulation-spec flag: shown next to a value (table cell) or under an input (live form)
+       when a scouted frame dimension / weight is over the FRC limit. Specs are never rejected
+       at save time — see the comment on scout_fields.reg_limit — just flagged everywhere. */
+    .reg-flag {
+      display: inline-block; background: var(--red-bg); color: var(--red);
+      font-size: .68rem; font-family: var(--display); font-weight: 700;
+      padding: .05rem .4rem; margin-left: .35rem; vertical-align: middle;
+    }
+    .reg-warn {
+      display: none; color: var(--red); font-size: .78rem; margin-top: .3rem;
+    }
+
+    /* "Other" note box: hidden until a choice field with an "Other" option is set to Other */
+    .other-note-wrap { display: none; margin-top: .4rem; }
+
+    /* "Unsure" checkbox next to a number/slider input */
+    .unsure-toggle { margin-top: .4rem; }
+
+    /* Slider fields: the range input plus a live numeric readout beside it */
+    .slider-row { display: flex; align-items: center; gap: .75rem; }
+    .slider-row input[type="range"] { flex: 1; }
+    .slider-row .slider-val {
+      font-family: var(--display); font-weight: 700; color: var(--heading);
+      min-width: 1.6rem; text-align: center;
+    }
+    .slider-row input.slider-unset { opacity: .45; }
+    .slider-clear {
+      background: none; border: 0; padding: 0; color: var(--muted);
+      font-size: .75rem; text-decoration: underline; cursor: pointer;
+    }
+    .slider-scale { display: flex; justify-content: space-between; font-size: .72rem; color: var(--muted); margin-top: .1rem; }
+
+    /* Picture fields: a styled "Choose File" trigger + filename text standing in for the
+       native file input, which can't be restyled consistently across browsers. */
+    .file-field { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+    .file-name { font-size: .85rem; color: var(--muted); }
+    .visually-hidden-file {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+    }
+
+    /* Recent entries table */
+    .entries-section h3 { font-size: 1.1rem; margin-bottom: .75rem; }
+    .entry-table { font-size: .88rem; }
+    .entry-table th { background: var(--navy); color: #fff; font-weight: 500; border: 0; white-space: nowrap; }
+    .entry-table td { border-top: 1px solid var(--line); vertical-align: middle; }
+    .entry-table tbody tr:nth-child(even) { background: var(--paper); }
+    .entry-table tbody tr:hover { background: var(--tint); }
+
+    /* Small square edit / delete buttons in the table's Actions column */
+    .btn-icon {
+      background: none; border: 1px solid var(--line); color: var(--muted);
+      padding: .2rem .45rem; font-size: .78rem; cursor: pointer; clip-path: none;
+      border-radius: 0;
+    }
+    .btn-icon:hover { background: var(--tint); color: var(--heading); }
+    .btn-icon.danger:hover { background: var(--red-bg); color: var(--red); border-color: var(--red); }
+
+    /* Event search bar */
+    .event-selector {
+      background: var(--white);
+      border: 1px solid var(--line);
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.5rem;
+      display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;
+    }
+    .event-selector .form-group { margin-bottom: 0; flex: 1; min-width: 200px; position: relative; }
+
+    /* Searchable event picker: a plain text input with a filtered dropdown of matches below it,
+       so finding the right event doesn't mean scrolling a <select> of every event the team has
+       ever attended. */
+    .event-search-results {
+      position: absolute;
+      top: 100%; left: 0; right: 0;
+      z-index: 20;
+      margin-top: 2px;
+      max-height: 320px;
+      overflow-y: auto;
+      background: var(--white);
+      border: 1px solid var(--line);
+      box-shadow: 0 12px 28px rgba(10,35,82,.12);
+    }
+    .event-option {
+      padding: .5rem .75rem;
+      cursor: pointer;
+      border-bottom: 1px solid var(--line);
+    }
+    .event-option:last-child { border-bottom: 0; }
+    .event-option:hover, .event-option.active { background: var(--tint); }
+    .event-option .eo-name { font-weight: 500; }
+    .event-option .eo-name small { color: var(--muted); font-weight: 400; }
+    .event-option .eo-loc { font-size: .8rem; color: var(--muted); }
+    .event-option.eo-default .eo-name::after {
+      content: "Default"; margin-left: .5rem;
+      background: var(--blue); color: #fff; font-size: .62rem; font-family: var(--display);
+      font-weight: 600; padding: .1rem .4rem; vertical-align: middle;
+    }
+    .event-search-empty { padding: .6rem .75rem; color: var(--muted); font-size: .88rem; }
+
+    /* Guest view: the code-entry card, then (once a code loads) the same two-pane
+       team-list + detail layout as query.html's Team Database, just scoped to the
+       code's events/teams instead of the whole database. */
+    .guest-card {
+      background: var(--white);
+      border: 1px solid var(--line);
+      border-top: 3px solid var(--blue);
+      padding: 2rem;
+      max-width: 460px; margin: 2rem auto;
+    }
+    .guest-wrap { max-width: 1200px; margin: 0 auto; }
+
+    .q-layout {
+      display: grid;
+      grid-template-columns: minmax(230px, 300px) minmax(0, 1fr);
+      gap: 1.25rem;
+      align-items: start;
+    }
+    @media (max-width: 991px) { .q-layout { grid-template-columns: 1fr; } }
+
+    .q-panel {
+      min-width: 0;
+      background: var(--white);
+      border: 1px solid var(--line);
+      border-top: 3px solid var(--blue);
+      padding: 1rem;
+    }
+
+    .team-list { border-top: 1px solid var(--line); }
+    .team-row {
+      display: flex; align-items: center; gap: .75rem;
+      padding: .5rem .35rem; border-bottom: 1px solid var(--line);
+      cursor: pointer; font-size: .9rem;
+    }
+    .team-row:hover { background: var(--tint); }
+    .team-row.selected { background: var(--tint); box-shadow: inset 3px 0 0 var(--blue); }
+    .team-row .tr-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .team-row .tr-name .team-name-sub { color: var(--muted); font-size: .85em; }
+    .tier-dot {
+      display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+      margin-right: 3px; vertical-align: middle; flex: none;
+    }
+    .list-scroll { max-height: 70vh; overflow-y: auto; }
+
+    .detail-card {
+      position: relative; min-width: 0;
+      background: var(--white);
+      border: 1px solid var(--line);
+      border-top: 3px solid var(--blue);
+      padding: 1.5rem; min-height: 320px;
+    }
+    .detail-head { padding-right: 210px; display: flex; gap: .9rem; align-items: center; }
+    .detail-head h2 { margin-bottom: .15rem; }
+    .team-logo {
+      width: 56px; height: 56px; object-fit: contain; flex: none;
+      background: var(--paper); border: 1px solid var(--line);
+    }
+    .team-logo-sm {
+      width: 20px; height: 20px; object-fit: contain; vertical-align: middle;
+      margin-right: .4rem; background: var(--paper); border: 1px solid var(--line);
+    }
+    .rating-group { position: absolute; top: 1.25rem; right: 1.25rem; display: flex; gap: .5rem; }
+    .rating-wrap { width: 92px; text-align: center; }
+    .rating-box {
+      height: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+    }
+    .rating-letter { font-family: var(--display); font-size: 2.3rem; font-weight: 700; line-height: 1; }
+    .rating-caption { font-size: .64rem; text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+    .rating-meta { font-size: .74rem; color: var(--muted); margin-top: .35rem; white-space: nowrap; }
+
+    .section-title { font-size: 1.05rem; margin: 1.5rem 0 .6rem; }
+    .src-badge {
+      font-size: .62rem; text-transform: uppercase; letter-spacing: .04em;
+      font-weight: 700; padding: .15rem .5rem; margin-left: .5rem;
+      border-radius: 3px; vertical-align: middle;
+    }
+    .src-badge.scout { background: var(--tint); color: var(--link); }
+    .src-badge.api   { background: var(--green-bg); color: var(--green); }
+
+    .tile-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: .6rem; margin-top: 1rem; }
+    .tile { border: 1px solid var(--line); padding: .6rem .75rem; background: var(--paper); }
+    .tile .v { font-family: var(--display); font-size: 1.3rem; color: var(--heading); font-weight: 700; line-height: 1.2; }
+    .tile .k { font-size: .75rem; color: var(--muted); line-height: 1.3; }
+
+    .info-grid { display: grid; grid-template-columns: 11rem 1fr; gap: .4rem 1rem; font-size: .92rem; margin: 0; }
+    .info-grid dt { color: var(--muted); font-weight: 500; }
+    .info-grid dd { margin: 0; word-break: break-word; }
+
+    .match-table { font-size: .86rem; }
+    .match-table th { background: var(--navy); color: #fff; font-weight: 500; border: 0; white-space: nowrap; }
+    .match-table td { border-top: 1px solid var(--line); white-space: nowrap; }
+    .match-table tbody tr:nth-child(even) { background: var(--paper); }
+
+    .empty-detail { color: var(--muted); text-align: center; padding: 3rem 1rem; }
+
+    @media (max-width: 575px) {
+      .detail-card { padding: 1rem; }
+      .detail-head { padding-right: 0; flex-wrap: wrap; }
+      .rating-group { position: static; margin: .9rem 0 0; width: 100%; }
+      .rating-wrap { width: 84px; }
+      .rating-box { height: 68px; }
+      .rating-letter { font-size: 1.9rem; }
+      .info-grid { grid-template-columns: 1fr; gap: .1rem .75rem; }
+      .info-grid dt { margin-top: .5rem; }
+      .tile-grid { grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); }
+      .list-scroll { max-height: 48vh; }
+    }
+
+    /* Toast notifications (bottom-right pop-ups created by toast() in the script) */
+    #toastWrap {
+      position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 9999;
+      display: flex; flex-direction: column; gap: .5rem;
+    }
+    .toast-msg {
+      background: var(--navy); color: #fff;
+      padding: .65rem 1.1rem; font-size: .875rem;
+      font-family: var(--display); border-left: 4px solid var(--blue);
+      box-shadow: 0 4px 16px rgba(0,0,0,.18);
+      animation: slideIn .2s ease;
+    }
+    .toast-msg.err { border-left-color: #c0392b; }
+    @keyframes slideIn { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+    /* "DRAFT" tag shown when an entry was saved offline */
+    .draft-badge {
+      display: inline-block;
+      background: #f0ad4e; color: #fff;
+      font-size: .7rem; font-family: var(--display); font-weight: 700;
+      padding: .1rem .45rem; margin-left: .4rem;
+      vertical-align: middle;
+    }
+
+    /* Picture fields: file picker + an in-page "Take Photo" button that opens the device
+       camera right on the page, via the #cameraModal below, instead of handing off to a
+       separate camera app. */
+    .photo-field-row { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+    #cameraVideo, #cameraCanvas { width: 100%; background: #000; }
+    #cameraCanvas { display: none; }
+
+    /* Your next match from Scout Shifts (shifts.html) */
+    .shift-banner { display: flex; align-items: center; gap: .5rem .9rem; flex-wrap: wrap; background: var(--white);
+      border: 1px solid var(--line); border-left: 4px solid var(--blue); padding: .5rem .75rem; margin-bottom: 1rem; font-size: .92rem; }
+    .shift-banner.red { border-left-color: #c0392b; }
+    .shift-banner strong { font-family: var(--display); }
+    .shift-banner .btn { font-size: .8rem; padding: .15rem .6rem; }
+    .shift-banner a.small { margin-left: auto; }
+
+    /* A field filled in from vision data (see js/visioncheck.js) */
+    .vision-filled { font-size: .78rem; color: var(--purple); margin: -.25rem 0 .4rem 1.6rem; }
+    .vision-hint { font-size: .78rem; color: var(--purple); margin-top: .2rem; }
+
+    /* QR relay: drafts shown as codes, and the scanner that reads them */
+    .qr-box { background: #fff; padding: 12px; display: inline-block; }
+    #scanVideo { width: 100%; background: #000; }
+    .scan-log { font-size: .85rem; margin: .5rem 0 0; padding-left: 1.1rem; }
+  </style>
+</head>
+<body>
+
+  <!-- ===== Navigation ===== -->
+  <nav class="navbar fixed-top navbar-expand-lg navbar-dark bg-dark" id="navigation">
+    <div class="container">
+      <a class="navbar-brand" href="/index.html">
+        <img src="/img/robosaintslogo.png" data-dark-src="/img/robosaintslogo-dark.png" id="navbarlogo" alt="">
+        St. Thomas Aquinas Robotics Team 1307
+      </a>
+      <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarResponsive"
+              aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <div class="collapse navbar-collapse" id="navbarResponsive">
+        <ul class="navbar-nav ml-auto">
+          <li class="nav-item">
+            <a class="nav-link" href="/index.html">Home</a>
+          </li>
+
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="navSponsors" role="button"
+              data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Sponsors</a>
+            <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navSponsors">
+              <a class="dropdown-item" href="/oursponsors.html">Our Sponsors</a>
+              <a class="dropdown-item" href="/business-plan.html">Business Plan</a>
+            </div>
+          </li>
+
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="navAbout" role="button"
+              data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">About Us</a>
+            <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navAbout">
+              <a class="dropdown-item" href="/about-the-students.html">The Students</a>
+              <a class="dropdown-item" href="/about-the-mentors.html">The Mentors</a>
+              <a class="dropdown-item" href="/about-the-robot.html">The Robots</a>
+              <a class="dropdown-item" href="/results.html">Season Results</a>
+            </div>
+          </li>
+
+          <li class="nav-item">
+            <a class="nav-link" href="/Gallery/gallery.html">Picture Gallery</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/contact.html">Contact Us</a>
+          </li>
+
+          <!-- 1307scout command center. Items marked data-role are shown or hidden by auth.js -->
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="navScout" role="button"
+              data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">1307scout</a>
+            <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navScout">
+              <a class="dropdown-item" href="/1307scout.html">1307scout Home</a>
+              <h6 class="dropdown-header" data-role="team" hidden>Data</h6>
+              <a class="dropdown-item" href="/live.html" data-role="team" hidden>Competition Day</a>
+              <a class="dropdown-item" href="/query.html" data-role="team" hidden>Team Database</a>
+              <a class="dropdown-item" href="/alliance.html" data-role="team" hidden>Alliance View</a>
+              <a class="dropdown-item" href="/scout.html" data-role="team" hidden>Scout</a>
+              <a class="dropdown-item" href="/flags.html" data-role="team" hidden>Match Flags</a>
+              <a class="dropdown-item" href="/playoffs.html" data-role="team" hidden>Playoff Selection</a>
+              <a class="dropdown-item" href="/bracket.html" data-role="team" hidden>Playoff Bracket</a>
+              <a class="dropdown-item" href="/share.html" data-role="team" hidden>Share Data</a>
+              <h6 class="dropdown-header" data-role="team" hidden>My Team</h6>
+              <a class="dropdown-item" href="/matches.html" data-role="team" hidden>Our Matches</a>
+              <a class="dropdown-item" href="/strategy.html" data-role="team" hidden>Match Strategy</a>
+              <a class="dropdown-item" href="/pitcrew.html" data-role="team" hidden>Pit Crew</a>
+              <a class="dropdown-item" href="/picklist.html" data-role="team" hidden>Pick List</a>
+              <a class="dropdown-item" href="/shifts.html" data-role="team" hidden>Scout Shifts</a>
+              <a class="dropdown-item" href="/team.html" data-role="team" hidden>Team Management</a>
+              <div class="dropdown-divider" data-role="staff" hidden></div>
+              <a class="dropdown-item" href="/portal.html" data-role="staff" hidden>Staff Portal</a>
+            </div>
+          </li>
+
+          <li class="nav-item" id="authNavItem">
+            <a class="nav-link" href="/signin.html">Sign In</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ══════════════════════════════════════════════════════════
+       TEAM VIEW (staff + students)
+  ══════════════════════════════════════════════════════════ -->
+  <div class="container" id="teamView" style="display:none; padding-top:2rem;">
+    <div class="scout-wrap">
+      <h1 class="mt-4 mb-1">Scout</h1>
+      <p class="text-muted mb-3" style="font-size:.95rem;">Record pit data and match data for the current event.</p>
+
+      <!-- Step 1: choose the event. A searchable picker instead of a plain dropdown — the
+           events table only grows, so scrolling a <select> of every event ever attended
+           doesn't hold up. Starts on the event staff marked as default in the Staff Portal
+           (falls back to the most recent event if none is set). -->
+      <div class="event-selector">
+        <div class="form-group">
+          <label for="eventSearch">Event</label>
+          <input type="text" id="eventSearch" class="form-control" placeholder="Search events by name, location, or year" autocomplete="off">
+          <div id="eventSearchResults" class="event-search-results" style="display:none;"></div>
+        </div>
+      </div>
+
+      <!-- Your next match, when staff gave you a shift (shifts.html) -->
+      <div class="shift-banner" id="shiftBanner" style="display:none;"></div>
+
+      <!-- Step 2: choose what you're recording -->
+      <div class="scout-tabs" role="tablist">
+        <button type="button" class="scout-tab active" role="tab" aria-selected="true" data-mode="match">Match Scouting</button>
+        <button type="button" class="scout-tab" role="tab" aria-selected="false" data-mode="pit">Pit Scouting</button>
+      </div>
+
+      <!-- Step 3: the entry form. Team/match boxes are fixed; everything inside #dynamicFields is built from scout_fields. -->
+      <div class="entry-form-card" id="entryFormCard" style="display:none;">
+        <h3 style="font-size:1.05rem; margin-bottom:1rem;" id="entryFormTitle">New Match Entry</h3>
+
+        <div class="form-row">
+          <div class="form-group col-6 col-md-4">
+            <label for="fTeam">Team # <span class="field-required">*</span></label>
+            <input type="number" id="fTeam" class="form-control" min="1" max="99999" required>
+          </div>
+          <!-- Match number only applies to match scouting; pit mode hides this group -->
+          <div class="form-group col-6 col-md-4" id="matchGroup">
+            <label for="fMatch">Match #</label>
+            <input type="number" id="fMatch" class="form-control" min="1" max="999">
+          </div>
+        </div>
+
+        <div id="dynamicFields"><!-- built from scout_fields --></div>
+
+        <input type="hidden" id="entryId"><!-- id of the entry being edited, empty for a new one -->
+        <div class="d-flex" style="gap:.5rem; margin-top:1.25rem;">
+          <button class="btn btn-primary" id="entrySave">Save Entry</button>
+          <button class="btn btn-outline-secondary btn-sm d-none" id="entryCancel">Cancel edit</button>
+          <!-- Shown when a save failed because the device is offline -->
+          <span id="draftIndicator" style="display:none; align-self:center;">
+            <span class="draft-badge">DRAFT</span>
+            <small class="text-muted ml-1">Saved locally — will submit when online.</small>
+            <button type="button" class="btn btn-outline-secondary btn-sm ml-2" id="showQr" title="Show waiting drafts as QR codes another scout can scan in">
+              <i class="fa fa-qrcode"></i> Hand off by QR</button>
+          </span>
+        </div>
+      </div>
+
+      <!-- Recent entries (match or pit, depending on the tab) -->
+      <div class="entries-section" id="entriesSection" style="display:none;">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h3 id="entriesHeading">Recent entries</h3>
+          <div>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="scanQr" title="Scan another scout's drafts off their screen and save them">
+              <i class="fa fa-camera"></i> Scan a scout's QR</button>
+            <input type="text" id="entrySearch" class="form-control form-control-sm d-inline-block"
+                   style="width:160px;" placeholder="Filter by team #" aria-label="Filter by team number">
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="table entry-table" id="entryTable">
+            <thead></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════
+       GUEST VIEW (signed in, but not staff or student)
+  ══════════════════════════════════════════════════════════ -->
+  <div class="container" id="guestView" style="display:none; padding-top:2rem;">
+    <div class="guest-wrap">
+      <div class="guest-card mt-3">
+        <h1 style="font-size:1.5rem;">View Shared Data</h1>
+        <p class="text-muted">Enter the 8-digit share code a team member gave you.</p>
+        <div class="form-group">
+          <label for="guestCode">Share code</label>
+          <input type="text" id="guestCode" class="form-control" maxlength="8" inputmode="numeric" pattern="[0-9]*" placeholder="Enter code">
+        </div>
+        <button class="btn btn-primary" id="guestLoad">View data</button>
+        <div id="guestMsg" class="mt-3"></div>
+      </div>
+
+      <!-- Shown once a code loads: the same team-list + detail layout as the Team Database
+           page, but scoped to only the events/teams the code allows. -->
+      <div class="q-layout" id="guestData" style="display:none; margin-top:1.5rem;">
+        <div class="q-panel">
+          <input type="text" id="gTeamSearch" class="form-control form-control-sm mb-2" placeholder="Search team # or name" aria-label="Search teams">
+          <div class="text-muted mb-2" id="gTeamCount" style="font-size:.82rem;"></div>
+          <div class="list-scroll"><div class="team-list" id="gTeamRows"></div></div>
+        </div>
+        <div class="detail-card" id="gDetail">
+          <div class="empty-detail">Select a team from the list.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Camera capture modal, shared by every picture field — shows the device camera right on
+       the page so a scout doesn't have to leave the site to take a photo. -->
+  <div class="modal fade" id="cameraModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Take Photo</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        </div>
+        <div class="modal-body">
+          <video id="cameraVideo" autoplay playsinline></video>
+          <canvas id="cameraCanvas"></canvas>
+          <p class="text-muted mt-2 mb-0" id="cameraError" style="display:none; font-size:.85rem;"></p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" id="cameraCapture">Capture</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- QR relay: this device's drafts as codes, for a device with a connection to scan -->
+  <div class="modal fade" id="qrModal" tabindex="-1" role="dialog" aria-labelledby="qrTitle">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="qrTitle">Hand off drafts</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        </div>
+        <div class="modal-body text-center">
+          <p class="text-muted" style="font-size:.88rem;">Have a scout who's online open Scout, press <strong>Scan a scout's QR</strong>, and point it at this code. The entry stays yours. It also stays on this device until this device gets a connection, which then sees it's already saved.</p>
+          <div class="qr-box" id="qrCode"></div>
+          <p class="mt-2 mb-0" id="qrCaption"></p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" id="qrPrev">Previous</button>
+          <button type="button" class="btn btn-primary" id="qrNext">Next</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal fade" id="scanModal" tabindex="-1" role="dialog" aria-labelledby="scanTitle">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="scanTitle">Scan a scout's QR</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        </div>
+        <div class="modal-body">
+          <video id="scanVideo" autoplay playsinline muted></video>
+          <p class="text-muted mt-2 mb-0" id="scanStatus" style="font-size:.85rem;">Starting the camera…</p>
+          <ul class="scan-log" id="scanLog"></ul>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary" data-dismiss="modal">Done</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Container for toast pop-ups -->
+  <div id="toastWrap" role="status" aria-live="polite"></div>
+
+  <!-- ===== Footer (same on every page) ===== -->
+  <footer class="py-5" id="bottomrow">
+    <a href="https://instagram.com/1307robosaints" class="fa fa-instagram" target="_blank" rel="noopener" aria-label="Instagram"></a>
+    <a href="https://www.youtube.com/@1307Robosaints" class="fa fa-youtube" target="_blank" rel="noopener" aria-label="YouTube"></a>
+    <a href="https://www.facebook.com/1307robosaints" class="fa fa-facebook" target="_blank" rel="noopener" aria-label="Facebook"></a>
+    <a href="https://www.tiktok.com/@1307.robotics" class="fa social-tt" target="_blank" rel="noopener" aria-label="TikTok">
+      <!-- Font Awesome 4.7 has no TikTok logo, so this one is an inline SVG -->
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path fill="currentColor" d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
+      </svg>
+    </a>
+    <div class="container">
+      <p class="m-0 text-center text-white">Copyright &copy; STA Robotics Team 2026</p>
+      <p class="m-0 mt-2 text-center" style="font-size:.78rem;">
+        Website and 1307scout service created and maintained by Daniel Lowry —
+        <a href="/contact.html" style="color:#fff;text-decoration:underline;">website support</a>
+      </p>
+      <p class="m-0 mt-2 text-center" style="font-size:.78rem;">
+        <a href="/privacy-policy.html" style="color:#fff;text-decoration:underline;">Privacy Policy</a>
+        &nbsp;&middot;&nbsp;
+        <a href="/terms-of-service.html" style="color:#fff;text-decoration:underline;">Terms of Service</a>
+      </p>
+    </div>
+  </footer>
+
+  <!-- ===== Scripts ===== -->
+  <script src="/vendor/jquery/jquery.min.js"></script>
+  <script src="/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" integrity="sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o" crossorigin="anonymous"></script>
+  <script src="/js/auth-config.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/dialog.js"></script>
+  <script src="/js/pwa.js"></script>
+  <script src="/js/teams.js"></script>
+  <script src="/js/ratings.js"></script>
+  <script src="/js/schedule.js"></script>
+  <script src="/js/vision.js"></script>
+  <script src="/js/visioncheck.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" integrity="sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU" crossorigin="anonymous"></script>
+  <script>
+  (async function () {
+    var sb = RS.sb;   // Supabase client created by auth.js
+
+    // ── Helpers ──────────────────────────────────────────────────────
+    // Pop a short message in the bottom-right corner (red when err is true)
+    function toast(msg, err) {
+      var d = document.createElement("div");
+      d.className = "toast-msg" + (err ? " err" : "");
+      d.textContent = msg;
+      document.getElementById("toastWrap").appendChild(d);
+      setTimeout(function () { d.remove(); }, err ? 7000 : 3200);   // errors need time to read
+    }
+    // Escape text before putting it into innerHTML so scouted text can't inject markup
+    function esc(s) {
+      return String(s == null ? "" : s)
+        .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+    }
+    function get(id) { return document.getElementById(id); }
+    // A saved photo as a thumbnail link. validate_data() only stores our own https URLs, but a link
+    // is the one place a stored value could run script (javascript:), so check here as well.
+    function photoHtml(url, size, style) {
+      if (!/^https:\/\//i.test(String(url))) return "—";
+      return '<a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer"><img src="' + esc(url) +
+        '" alt="Scouted photo" style="height:' + size + 'px;width:' + size + 'px;object-fit:cover;' + (style || "") + '"></a>';
+    }
+    // Digits only. parseInt alone would read "1e3" (valid in a number box) as team 1.
+    function wholeNumber(v) { return /^\d+$/.test(String(v).trim()) ? parseInt(v, 10) : NaN; }
+
+    // Label text for a dynamic field: a red "*" when staff marked it required, a muted
+    // "(optional)" otherwise, so that marker is consistent across every field instead of
+    // only ever appearing on the hardcoded Match # box.
+    function fieldLabelHtml(f) {
+      return esc(f.label) + (f.required
+        ? ' <span class="field-required">*</span>'
+        : ' <span class="field-optional">(optional)</span>');
+    }
+
+    // ── In-page camera capture for picture fields ─────────────────────
+    // Opens the device camera inside #cameraModal so a scout can take a photo without leaving
+    // the site, then writes the captured frame into the matching file input (via a DataTransfer,
+    // the same object a native file picker would produce) so the rest of the image-field code
+    // — preview, upload on save — treats it exactly like a chosen file.
+    var cameraStream = null, cameraTargetKey = null, cameraRequest = 0;
+    async function openCamera(key) {
+      var request = ++cameraRequest;
+      cameraTargetKey = key;
+      var errEl = get("cameraError");
+      errEl.style.display = "none";
+      get("cameraVideo").style.display = "";
+      get("cameraCanvas").style.display = "none";
+      $("#cameraModal").modal("show");
+      try {
+        var stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        // Closed during the permission prompt: without this the camera stays on with nothing showing
+        if (request !== cameraRequest) { stream.getTracks().forEach(function (t) { t.stop(); }); return; }
+        cameraStream = stream;
+        get("cameraVideo").srcObject = stream;
+      } catch (e) {
+        errEl.textContent = "Couldn't open the camera (" + e.message + "). Use the file picker instead.";
+        errEl.style.display = "";
+      }
+    }
+    function stopCamera() {
+      cameraRequest++;
+      if (cameraStream) { cameraStream.getTracks().forEach(function (t) { t.stop(); }); cameraStream = null; }
+    }
+    $("#cameraModal").on("hidden.bs.modal", stopCamera);
+    document.getElementById("cameraCapture").addEventListener("click", function () {
+      if (!cameraStream || !cameraTargetKey) return;
+      var video = get("cameraVideo"), canvas = get("cameraCanvas");
+      canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+      canvas.getContext("2d").drawImage(video, 0, 0);
+      canvas.toBlob(function (blob) {
+        if (!blob) return;
+        var file = new File([blob], "camera-" + Date.now() + ".jpg", { type: "image/jpeg" });
+        var input = get("field_" + cameraTargetKey);
+        if (input) {
+          var dt = new DataTransfer();
+          dt.items.add(file);
+          input.files = dt.files;
+          input.dispatchEvent(new Event("change"));
+        }
+        $("#cameraModal").modal("hide");
+      }, "image/jpeg", 0.9);
+    });
+
+    // ── Check hash for guest share code ──────────────────────────────
+    // Share links look like /scout.html#code=XXXX. Grab the code, then clean the URL so it isn't left in history.
+    var hashCode = new URLSearchParams(location.hash.slice(1)).get("code");
+    if (hashCode) history.replaceState(null, "", location.pathname);
+
+    // ── Auth / access level ──────────────────────────────────────────
+    // RS.session() also returns the login saved on this device when offline (see auth.js)
+    var s = await RS.session();
+    if (!s) {
+      // Not signed in: remember the code so it survives the trip through the sign-in page
+      if (hashCode) sessionStorage.setItem("rs_code", hashCode);
+      location.replace("signin.html"); return;
+    }
+
+    // A code saved before sign-in is used once, here. Team members don't need it, so it's
+    // cleared either way, which also stops account.html sending anyone back to this page.
+    var savedCode = sessionStorage.getItem("rs_code");
+    sessionStorage.removeItem("rs_code");
+
+    var DRAFT_KEY = "rs_drafts_" + s.user.id;
+    // Copies of the events list and the form, so this page still opens with no connection
+    var OFFLINE_KEY = "rs_offline_" + s.user.id;
+    function offlineCopy() {
+      try { return JSON.parse(localStorage.getItem(OFFLINE_KEY) || "{}"); } catch (e) { return {}; }
+    }
+    function keepOffline(part, rows) {
+      var kit = offlineCopy();
+      kit[part] = rows;
+      try { localStorage.setItem(OFFLINE_KEY, JSON.stringify(kit)); } catch (e) {}
+    }
+
+    // my_access_level() is a database function returning 'staff', 'student', or 'guest'.
+    // Offline, the level saved on this device is used instead (the server still checks every save).
+    var lvl = await RS.accessLevel({ offline: true });
+    if (lvl === null) return;
+    var isStaff = lvl === "staff", isStudent = lvl === "student", isTeam = isStaff || isStudent;
+
+    // ── Offline draft queue (match entries only) ─────────────────────
+    // If a save fails because the device is offline, the entry is stored in localStorage and
+    // re-sent by flushDrafts() when the connection comes back. A draft is either a new entry
+    // (the insert payload, with an id made here so a retry can't create it twice) or an edit,
+    // stored as { editId, patch } so that going offline mid-edit can't duplicate the entry.
+
+    // True when a request never got an answer from the database. supabase-js reports that as
+    // status 0 (502+ is the gateway), and its message text differs between browsers.
+    function isNetworkError(r) {
+      return !navigator.onLine || r.status === 0 || r.status >= 502;
+    }
+    // With no connection and an expired login, supabase-js retries the refresh for up to 30 s
+    // before a request fails. Requests that have an offline fallback give up sooner: at once when
+    // the device knows it's offline, otherwise after a few seconds. Safe for saves, since a draft
+    // that got through after all is recognized by its id when the queue is sent.
+    function quick(req, ms) {
+      var fail = { error: { message: "No connection" }, status: 0, data: null };
+      if (navigator.onLine === false) return Promise.resolve(fail);
+      return Promise.race([req, new Promise(function (res) { setTimeout(function () { res(fail); }, ms || 10000); })]);
+    }
+    function newId() {
+      if (crypto.randomUUID) return crypto.randomUUID();
+      return "10000000-1000-4000-8000-100000000000".replace(/[018]/g, function (c) {
+        return (c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))).toString(16);
+      });
+    }
+    function draftKey(d) { return d.editId || d.id; }
+    
+    function getDrafts() {
+      try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || "[]"); } catch(e) { return []; }
+    }
+    function saveDrafts(arr) {
+      try { localStorage.setItem(DRAFT_KEY, JSON.stringify(arr)); } catch(e) {}
+    }
+    // Add a draft. A second offline edit of the same entry replaces the first.
+    function queueDraft(d) {
+      var key = draftKey(d);
+      saveDrafts(getDrafts().filter(function (x) { return draftKey(x) !== key; }).concat([d]));
+    }
+    // Remove drafts by key, re-reading storage so one queued during a flush isn't lost
+    function removeDrafts(keys) {
+      saveDrafts(getDrafts().filter(function (d) { return keys.indexOf(draftKey(d)) === -1; }));
+    }
+    // Try to send every stored draft. The online event and page boot can both call this, so
+    // only one run happens at a time. Stops at the first sign the connection is still down.
+    var flushing = false;
+    async function flushDrafts() {
+      if (flushing || navigator.onLine === false) return;
+      flushing = true;
+      try {
+        // Drafts saved before ids existed get one now, so a retry can't double them
+        var drafts = getDrafts().map(function (d) { if (!draftKey(d)) d.id = newId(); return d; });
+        saveDrafts(drafts);
+        var sent = [], rejected = [], reason = "";
+        for (var i = 0; i < drafts.length; i++) {
+          var d = drafts[i];
+          var r = await quick(d.editId
+            ? sb.from("scouting_entries").update(d.patch).eq("id", d.editId).select("id")
+            : sb.from("scouting_entries").insert(d));
+          // 23505 = this id is already saved: an earlier try got through but its reply was lost
+          if (r.error && r.error.code === "23505") sent.push(draftKey(d));
+          else if (r.error && isNetworkError(r)) break;
+          else if (r.error) { rejected.push(draftKey(d)); reason = r.error.message; }
+          else if (d.editId && !r.data.length) { rejected.push(draftKey(d)); reason = "you can no longer edit that entry"; }
+          else sent.push(draftKey(d));
+        }
+        if (sent.length) {
+          removeDrafts(sent);
+          toast(sent.length + " draft" + (sent.length > 1 ? "s" : "") + " submitted.");
+          loadEntries();
+        }
+        // Retrying won't help these, and they'd block nothing but stay forever, so ask
+        if (rejected.length && await RSDialog.confirm(rejected.length + " saved draft" + (rejected.length > 1 ? "s were" : " was") +
+            " rejected by the server (" + reason + "). Discard " + (rejected.length > 1 ? "them" : "it") + "? Keep saves a copy on this device.",
+            { title: "Drafts not accepted", ok: "Discard", cancel: "Keep", danger: true })) {
+          removeDrafts(rejected);
+        }
+        // Still shown after a reload, so a scout knows entries are waiting on this device
+        get("draftIndicator").style.display = getDrafts().length ? "flex" : "none";
+      } finally {
+        flushing = false;
+      }
+    }
+
+    // ── GUEST VIEW ───────────────────────────────────────────────────
+    // Mirrors the Team Database page (query.html): a team list on the left, a detail card
+    // on the right with the same ratings/pit/match-history layout — just scoped to only the
+    // events/teams the share code allows, via the one get_shared_scouting() RPC below.
+
+    // Letter-grade colors, same as query.html. NR ("needs 3+ matches") is decided client-side;
+    // every other grade comes straight from the scoped percentile get_shared_scouting() computes.
+    var G_TIERS = {
+      S: { color: "#D4AF37", ink: "#2b2100" }, A: { color: "#1a7f4b", ink: "#ffffff" },
+      B: { color: "#1B4DB1", ink: "#ffffff" }, C: { color: "#6c3fb5", ink: "#ffffff" },
+      D: { color: "#e67e22", ink: "#ffffff" }, F: { color: "#c0392b", ink: "#ffffff" },
+      NR: { color: "#9a9a9c", ink: "#ffffff" }
+    };
+    var G_MIN_RATED_MATCHES = 3;
+    var gPayload = null, gSelected = null, gEventsById = {};
+
+    if (!isTeam) {
+      get("guestView").style.display = "";
+      // Use the code from the link (or one saved before sign-in) and load it right away
+      var code = hashCode || savedCode || "";
+      if (code) { get("guestCode").value = code; loadGuest(code); }
+      get("guestLoad").addEventListener("click", function () {
+        loadGuest(get("guestCode").value.trim());
+      });
+      get("guestCode").addEventListener("keydown", function (e) {
+        if (e.key === "Enter") loadGuest(this.value.trim());
+      });
+      get("gTeamSearch").addEventListener("input", renderGuestList);
+      get("gTeamRows").addEventListener("click", function (e) {
+        var row = e.target.closest(".team-row[data-team]");
+        if (row) openGuestTeam(parseInt(row.dataset.team, 10));
+      });
+      // Rows are divs, so Enter and Space need wiring up for keyboard users
+      get("gTeamRows").addEventListener("keydown", function (e) {
+        var row = e.target.closest(".team-row[data-team]");
+        if (!row || (e.key !== "Enter" && e.key !== " ")) return;
+        e.preventDefault();
+        var team = row.dataset.team;
+        openGuestTeam(parseInt(team, 10));
+        get("gTeamRows").querySelector('[data-team="' + team + '"]').focus();   // the list was redrawn
+      });
+      return;   // guests never reach the team code below
+    }
+
+    function gTierFor(block) {
+      // No grade means no score yet (an official score needs 3 qualification matches)
+      if (!block || (block.matches || 0) < G_MIN_RATED_MATCHES || !block.grade) {
+        return { tier: "NR", matches: block ? block.matches : 0, avg: null, pct: null };
+      }
+      return { tier: block.grade, matches: block.matches, avg: block.avg_points != null ? block.avg_points : block.avg_score,
+               score: block.score, pct: block.pct };
+    }
+    function gEvName(id) { var e = gEventsById[id]; return e ? e.name : "—"; }
+
+    // Ask the database for the slice of data a share code allows (events, fields, teams with
+    // their grades, matches, pit entries, official results — all already scoped server-side).
+    async function loadGuest(code) {
+      if (!code) return;
+      var msg = get("guestMsg");
+      msg.innerHTML = "";
+      get("guestData").style.display = "none";
+      var r = await sb.rpc("get_shared_scouting", { p_code: code });
+      if (r.data && r.data.error === "rate_limited") {
+        msg.innerHTML = '<div class="alert alert-warning">Too many incorrect codes. Please wait 10 minutes and try again.</div>';
+        return;
+      }
+      if (r.error || !r.data) { msg.innerHTML = '<div class="alert alert-danger">Code not found or access has been revoked.</div>'; return; }
+      gPayload = r.data;
+      gEventsById = {};
+      (gPayload.events || []).forEach(function (e) { gEventsById[e.id] = e; });
+      if (!gPayload.teams || !gPayload.teams.length) {
+        msg.innerHTML = '<div class="alert alert-warning">No data matches this code yet.</div>';
+        return;
+      }
+      get("guestData").style.display = "";
+      gSelected = null;
+      renderGuestList();
+      get("gDetail").innerHTML = '<div class="empty-detail">Select a team from the list.</div>';
+    }
+
+    function renderGuestList() {
+      var q = get("gTeamSearch").value.trim().toLowerCase();
+      var rows = (gPayload.teams || []).filter(function (t) {
+        if (!q) return true;
+        var hay = (String(t.team_number) + " " + (t.team_name || "")).toLowerCase();
+        return hay.indexOf(q) !== -1;
+      }).sort(function (a, b) { return a.team_number - b.team_number; });
+
+      get("gTeamRows").innerHTML = rows.length
+        ? rows.map(function (t) {
+            var gScout = gTierFor(t.scout), gOff = gTierFor(t.official);
+            var dots = '<span class="tier-dot" style="background:' + G_TIERS[gScout.tier].color + ';" title="Scouting: ' + gScout.tier + '"></span>' +
+              '<span class="tier-dot" style="background:' + G_TIERS[gOff.tier].color + ';" title="Official: ' + gOff.tier + '"></span>';
+            var logoImg = t.logo_url ? '<img class="team-logo-sm" src="' + esc(t.logo_url) + '" alt="">' : "";
+            var nameSuffix = t.team_name ? ' <span class="team-name-sub">' + esc(t.team_name) + '</span>' : "";
+            return '<div data-team="' + t.team_number + '" role="button" tabindex="0" class="team-row' + (gSelected === t.team_number ? " selected" : "") + '">' +
+              '<div class="tr-name">' + dots + logoImg + "<strong>" + t.team_number + "</strong>" + nameSuffix + "</div>" +
+              "</div>";
+          }).join("")
+        : '<div class="text-muted text-center py-3">No teams match.</div>';
+      get("gTeamCount").textContent = rows.length + (rows.length === 1 ? " team" : " teams");
+    }
+
+    function gCell(v, f, data) {
+      data = data || {};
+      if (f.allow_unsure && data[f.key + "__unsure"]) return "Unsure";
+      if (v == null || v === "") return "—";
+      if (f.field_type === "boolean") return v ? "Yes" : "No";
+      if (f.field_type === "image") return photoHtml(v, 40);
+      var html = esc(v);
+      if (f.field_type === "choice" && v === "Other" && data[f.key + "__other_note"]) {
+        html += ' <span class="text-muted" style="font-size:.85em;">(' + esc(data[f.key + "__other_note"]) + ')</span>';
+      }
+      if (f.reg_limit != null && Number(v) > Number(f.reg_limit)) {
+        html += ' <span class="reg-flag" title="Exceeds the ' + esc(f.reg_limit) + ' limit">Over limit</span>';
+      }
+      return html;
+    }
+    function gFmtDate(d) {
+      if (!d) return "—";
+      return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    }
+    function gMatchLabel(r) {
+      if (r.comp_level === "qm") return "Qual " + r.match_number;
+      if (r.comp_level === "sf") return "Playoff " + (r.set_number || r.match_number);
+      return "Final " + r.match_number;
+    }
+    function gOfficialHtml(rows) {
+      var head = '<h3 class="section-title">Official results<span class="src-badge api">API</span></h3>';
+      if (!rows.length) return head + '<p class="text-muted">No official match data in this code’s scope.</p>';
+      var wins = 0, losses = 0, ties = 0, total = 0, n = 0;
+      rows.forEach(function (r) {
+        if (r.alliance_score == null || r.opponent_score == null) return;
+        total += r.alliance_score; n++;
+        if (r.alliance_score > r.opponent_score) wins++;
+        else if (r.alliance_score < r.opponent_score) losses++;
+        else ties++;
+      });
+      var body = rows.map(function (r) {
+        var played = r.alliance_score != null && r.opponent_score != null;
+        var result = !played ? "—" : r.alliance_score > r.opponent_score ? "W" : r.alliance_score < r.opponent_score ? "L" : "T";
+        return "<tr><td>" + esc(gEvName(r.event_id)) + "</td><td>" + esc(gMatchLabel(r)) + "</td>" +
+          "<td>" + esc(r.alliance) + "</td>" +
+          "<td>" + (played ? r.alliance_score + " – " + r.opponent_score : "—") + "</td>" +
+          "<td>" + result + "</td></tr>";
+      }).join("");
+      return head +
+        '<p class="text-muted mb-2" style="font-size:.9rem;">Record ' + wins + "-" + losses + "-" + ties +
+        " · " + n + " matches played" +
+        (n ? " · avg alliance score " + (total / n).toFixed(1) : "") + "</p>" +
+        '<div class="table-responsive"><table class="table match-table"><thead><tr>' +
+        "<th>Event</th><th>Match</th><th>Alliance</th><th>Score (us – them)</th><th>Result</th>" +
+        "</tr></thead><tbody>" + body + "</tbody></table></div>";
+    }
+
+    function openGuestTeam(team) {
+      gSelected = team;
+      renderGuestList();
+      if (window.innerWidth < 992) {
+        get("gDetail").scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+      var t = (gPayload.teams || []).find(function (x) { return x.team_number === team; });
+      if (!t) return;
+      var mFields = (gPayload.fields || []).filter(function (f) { return (f.scope || "match") === "match"; });
+      var pFields = (gPayload.fields || []).filter(function (f) { return f.scope === "pit"; });
+      var matches = (gPayload.matches || []).filter(function (m) { return m.team_number === team; })
+        .sort(function (a, b) { return (a.match_number || 0) - (b.match_number || 0); });
+      var pitRows = (gPayload.pit || []).filter(function (p) { return p.team_number === team; })
+        .sort(function (a, b) { return new Date(b.updated_at) - new Date(a.updated_at); });
+      var pit = pitRows[0] || null;
+      var officialRows = (gPayload.official || []).filter(function (o) { return o.team_number === team; })
+        .sort(function (a, b) { return new Date(a.played_at || 0) - new Date(b.played_at || 0); });
+
+      renderGuestDetail(team, t, gTierFor(t.scout), gTierFor(t.official), mFields, pFields, matches, pit, officialRows);
+    }
+
+    function renderGuestDetail(team, t, gScout, gOff, mFields, pFields, matches, pit, officialRows) {
+      var tiles = [
+        ["Scouted matches", matches.length],
+        ["Official matches", officialRows.length],
+        ["Avg pts / match (scouted)", gScout.avg == null ? "—" : gScout.avg],
+        ["Avg alliance score (official)", gOff.avg == null ? "—" : gOff.avg]
+      ];
+
+      var paramsHtml;
+      if (!pit) {
+        paramsHtml = '<p class="text-muted">No pit data yet.</p>';
+      } else {
+        var rows = pFields.map(function (f) {
+          var v = pit.data ? pit.data[f.key] : null;
+          var unsure = f.allow_unsure && pit.data && pit.data[f.key + "__unsure"];
+          if ((v == null || v === "") && !unsure) return "";
+          return "<dt>" + esc(f.label) + "</dt><dd>" + gCell(v, f, pit.data) + "</dd>";
+        }).join("");
+        paramsHtml = (rows
+            ? '<dl class="info-grid">' + rows + "</dl>"
+            : '<p class="text-muted">Pit entry has no values filled in.</p>') +
+          '<p class="text-muted mt-2 mb-0" style="font-size:.8rem;">Last pit scouted at ' +
+          esc(gEvName(pit.event_id)) + " · " + gFmtDate(pit.updated_at) + "</p>";
+      }
+
+      var matchCols = ["Event", "Match"].concat(mFields.map(function (f) { return f.label; }));
+      var matchRows = matches.map(function (m) {
+        return "<tr><td>" + esc(gEvName(m.event_id)) + "</td><td>" + (m.match_number || "—") + "</td>" +
+          mFields.map(function (f) { return "<td>" + gCell(m.data ? m.data[f.key] : null, f, m.data) + "</td>"; }).join("") +
+          "</tr>";
+      }).join("");
+
+      var logoHtml = t.logo_url ? '<img class="team-logo" src="' + esc(t.logo_url) + '" alt="">' : "";
+
+      function rbox(label, g) {
+        var c = G_TIERS[g.tier];
+        var meta = g.tier === "NR" ? "Not rated" : (g.matches + (g.matches === 1 ? " match" : " matches"));
+        return '<div class="rating-wrap">' +
+          '<div class="rating-box" style="background:' + c.color + ';color:' + c.ink + ';">' +
+            '<span class="rating-letter">' + g.tier + '</span>' +
+            '<span class="rating-caption">' + esc(label) + '</span>' +
+          '</div>' +
+          '<div class="rating-meta">' + meta + '</div>' +
+        '</div>';
+      }
+      // value: what the grade is built on, e.g. "avg 41 pts"
+      function basis(label, value, g) {
+        if (g.tier === "NR") return label + ": needs at least " + G_MIN_RATED_MATCHES + " matches to be rated (" + g.matches + " so far).";
+        return label + ": " + value + ".";
+      }
+
+      get("gDetail").innerHTML =
+        '<div class="rating-group">' + rbox("Scouting", gScout) + rbox("Official", gOff) + '</div>' +
+        '<div class="detail-head">' +
+          logoHtml +
+          '<div>' +
+            "<h2>" + team + (t.team_name ? ' <small class="text-muted">' + esc(t.team_name) + '</small>' : "") + "</h2>" +
+            '<p class="text-muted mb-0" style="font-size:.92rem;">' + esc(basis("Scouting", "avg " + gScout.avg + " pts", gScout)) + "</p>" +
+            '<p class="text-muted mb-0" style="font-size:.92rem;">' + esc(basis("Official", "adds about " + gOff.score + " pts per match (OPR)", gOff)) + "</p>" +
+            '<p class="mb-0" style="font-size:.85rem;"><a href="/ratings.html">How ratings work</a></p>' +
+          '</div>' +
+        "</div>" +
+        '<div class="tile-grid">' +
+          tiles.map(function (x) { return '<div class="tile"><div class="v">' + esc(x[1]) + '</div><div class="k">' + esc(x[0]) + "</div></div>"; }).join("") +
+        "</div>" +
+        '<h3 class="section-title">Robot parameters<span class="src-badge scout">Scouted</span></h3>' + paramsHtml +
+        gOfficialHtml(officialRows) +
+        '<h3 class="section-title">Match history<span class="src-badge scout">Scouted</span></h3>' +
+        (matches.length
+          ? '<div class="table-responsive"><table class="table match-table"><thead><tr>' +
+              matchCols.map(function (c) { return "<th>" + esc(c) + "</th>"; }).join("") +
+            "</tr></thead><tbody>" + matchRows + "</tbody></table></div>"
+          : '<p class="text-muted">No match data yet.</p>');
+    }
+
+    // ── TEAM VIEW ────────────────────────────────────────────────────
+    get("teamView").style.display = "";
+
+    // State for the page:
+    //   events / fields   rows from the events and scout_fields tables
+    //   allEntries        match entries for the selected event;  allPit  its pit entries
+    //   currentEvent      the selected event row
+    //   editingId         id of the entry being edited (null = creating a new one)
+    //   mode              "match" or "pit" (the active tab)
+    //   filterVal         text typed in the "Filter by team #" box
+    var events = [], fields = [], allEntries = [], allPit = [];
+    var currentEvent = null, editingId = null, mode = "match", filterVal = "";
+    //   prefillKeys       fields on the form filled in from vision (saved as the entry's prefilled list)
+    //   touchedFields     fields the scout has changed since the form was cleared
+    var prefillKeys = new Set(), touchedFields = new Set(), editHadPrefill = false;
+
+    // Fields shown on the active tab. Fields with no scope count as match fields.
+    function activeFields() {
+      return fields.filter(function (f) { return (f.scope || "match") === mode; });
+    }
+
+    // Load events (newest first), then auto-select the one staff marked as default in the
+    // Staff Portal — or, if none is set, the most recent event.
+    // pending: a request already sent (the boot sends this and the fields request together)
+    async function loadEvents(pending) {
+      var r = await quick(pending || sb.from("events").select("*").order("event_date", { ascending: false, nullsFirst: false }));
+      var saved = offlineCopy().events;
+      if (r.error && isNetworkError(r) && saved) { r = { data: saved }; usingOfflineCopy = true; }
+      else if (!r.error) keepOffline("events", r.data);
+      if (r.error) { toast("Couldn't load events.", true); return; }
+      events = r.data;
+      if (!events.length) get("eventSearch").placeholder = "No events yet. Staff can add one in the Staff Portal.";
+      var def = events.find(function (ev) { return ev.is_default_event; });
+      if (def || events.length) selectEvent(def || events[0]);
+    }
+
+    // ── Searchable event picker ─────────────────────────────────────
+    // A text input + filtered dropdown stand in for a <select>, which stops being usable once
+    // the events table has a few seasons' worth of rows in it.
+    function eventLabel(ev) {
+      return ev.name + (ev.event_date ? " (" + fmtEventDate(ev.event_date, { month: "short", day: "numeric", year: "numeric" }) + ")" : "");
+    }
+    var eventActiveIdx = -1;
+    function matchingEvents(q) {
+      q = q.trim().toLowerCase();
+      if (!q) return events;
+      return events.filter(function (ev) {
+        var hay = (ev.name + " " + (ev.location || "") + " " + (ev.event_date || "")).toLowerCase();
+        return hay.indexOf(q) !== -1;
+      });
+    }
+    function renderEventResults(showAll) {
+      var q = showAll ? "" : get("eventSearch").value;
+      var list = matchingEvents(q);
+      var box = get("eventSearchResults");
+      if (!list.length) {
+        box.innerHTML = '<div class="event-search-empty">No events match.</div>';
+      } else {
+        box.innerHTML = list.map(function (ev, i) {
+          return '<div class="event-option' + (ev.is_default_event ? " eo-default" : "") + (i === eventActiveIdx ? " active" : "") + '" data-idx="' + i + '">' +
+            '<div class="eo-name">' + esc(ev.name) + (ev.event_date ? " <small>(" + esc(fmtEventDate(ev.event_date, { month: "short", day: "numeric", year: "numeric" })) + ")</small>" : "") + '</div>' +
+            (ev.location ? '<div class="eo-loc">' + esc(ev.location) + '</div>' : "") +
+          '</div>';
+        }).join("");
+      }
+      box.dataset.list = JSON.stringify(list.map(function (ev) { return ev.id; }));
+      box.style.display = "";
+    }
+    function closeEventResults() { get("eventSearchResults").style.display = "none"; eventActiveIdx = -1; }
+    function selectEvent(ev) {
+      currentEvent = ev;
+      get("eventSearch").value = eventLabel(ev);
+      closeEventResults();
+      get("entryFormCard").style.display = "";
+      get("entriesSection").style.display = "";
+      shiftInfo = null; visionCheck = null; visionRows = {};
+      loadEntries();
+      resetEntryForm();
+      loadShift();
+      loadVision();
+    }
+    // Focusing the box selects its text and shows every event, not just ones matching the
+    // currently-selected event's own label — otherwise the first click would show almost nothing.
+    get("eventSearch").addEventListener("focus", function () { this.select(); eventActiveIdx = -1; renderEventResults(true); });
+    get("eventSearch").addEventListener("input", function () { eventActiveIdx = -1; renderEventResults(); });
+    get("eventSearch").addEventListener("keydown", function (e) {
+      var ids = JSON.parse(get("eventSearchResults").dataset.list || "[]");
+      if (!ids.length && e.key !== "Escape") return;
+      if (e.key === "ArrowDown") { e.preventDefault(); eventActiveIdx = Math.min(eventActiveIdx + 1, ids.length - 1); renderEventResults(); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); eventActiveIdx = Math.max(eventActiveIdx - 1, 0); renderEventResults(); }
+      else if (e.key === "Enter") {
+        e.preventDefault();
+        var id = ids[eventActiveIdx >= 0 ? eventActiveIdx : 0];
+        var ev = events.find(function (x) { return x.id === id; });
+        if (ev) selectEvent(ev);
+      } else if (e.key === "Escape") {
+        closeEventResults();
+        get("eventSearch").value = currentEvent ? eventLabel(currentEvent) : "";
+      }
+    });
+    get("eventSearchResults").addEventListener("click", function (e) {
+      var opt = e.target.closest(".event-option[data-idx]");
+      if (!opt) return;
+      var ids = JSON.parse(get("eventSearchResults").dataset.list || "[]");
+      var ev = events.find(function (x) { return x.id === ids[parseInt(opt.dataset.idx, 10)]; });
+      if (ev) selectEvent(ev);
+    });
+    document.addEventListener("click", function (e) {
+      if (!e.target.closest(".event-selector .form-group")) closeEventResults();
+    });
+
+    // Load the form definition (only fields staff have left active), then build the form
+    async function loadFields(pending) {
+      var r = await quick(pending || sb.from("scout_fields").select("*").eq("active", true).order("sort_order", { ascending: true }));
+      var saved = offlineCopy().fields;
+      if (r.error && isNetworkError(r) && saved) { r = { data: saved }; usingOfflineCopy = true; }
+      else if (!r.error) keepOffline("fields", r.data);
+      if (r.error) { toast("Couldn't load form fields.", true); return; }
+      fields = r.data;
+      buildForm();
+    }
+
+    // Keep each section together, ordered by where it first appears in sort_order.
+    function groupedFields(list) {
+      var order = [], groups = {};
+      list.forEach(function (f) {
+        if (!groups[f.section]) { groups[f.section] = []; order.push(f.section); }
+        groups[f.section].push(f);
+      });
+      return order.reduce(function (out, sec) { return out.concat(groups[sec]); }, []);
+    }
+
+    // Fields that have a "note box" companion, shown only once the field's value is "Other",
+    // and the note field automatically accepted by the backend as "<key>__other_note" without
+    // staff having to add a separate row for it (see the comment on validate_data() in
+    // rebuild_all.sql). Works for any choice field whose options include "Other".
+    function hasOtherOption(f) { return f.field_type === "choice" && (f.options || []).indexOf("Other") !== -1; }
+
+    // A field value scored against scout_fields.reg_limit — an FRC spec limit that's flagged,
+    // not enforced (see the comment on that column in rebuild_all.sql).
+    function overRegLimit(f, v) { return f.reg_limit != null && v != null && v !== "" && Number(v) > Number(f.reg_limit); }
+
+    // A slider always shows some position, so "not answered" has to be tracked separately. It
+    // starts unset and saves nothing until a scout uses it. Otherwise every untouched slider
+    // records the middle value, and that made-up number feeds the team's rating.
+    function setSliderState(el, isSet) {
+      if (!isSet) el.value = Math.round((Number(el.min) + Number(el.max)) / 2);
+      el.dataset.answered = isSet ? "1" : "";
+      el.classList.toggle("slider-unset", !isSet);
+      var row = el.parentElement;
+      row.querySelector(".slider-val").textContent = isSet ? el.value : "—";
+      row.querySelector(".slider-clear").style.display = isSet ? "" : "none";
+    }
+
+    // Build the form for the active tab. Booleans become checkboxes.
+    function buildForm() {
+      var container = get("dynamicFields");
+      container.innerHTML = "";
+      var currentSection = null;
+      groupedFields(activeFields()).forEach(function (f) {
+        // Start a new heading whenever the section name changes
+        if (f.section !== currentSection) {
+          currentSection = f.section;
+          var h = document.createElement("div");
+          h.className = "field-section-heading";
+          h.textContent = f.section;
+          container.appendChild(h);
+        }
+        var group = document.createElement("div");
+        group.className = "form-group";
+
+        // Yes/No fields: a single checkbox
+        if (f.field_type === "boolean") {
+          var wrap = document.createElement("div");
+          wrap.className = "custom-control custom-checkbox mb-2";
+          var cb = document.createElement("input");
+          cb.type = "checkbox"; cb.className = "custom-control-input";
+          cb.id = "field_" + f.key; cb.dataset.fieldKey = f.key;
+          var cbLabel = document.createElement("label");
+          cbLabel.className = "custom-control-label";
+          cbLabel.htmlFor = cb.id; cbLabel.innerHTML = fieldLabelHtml(f);
+          wrap.appendChild(cb); wrap.appendChild(cbLabel);
+          group.appendChild(wrap);
+          container.appendChild(group);
+          return;
+        }
+
+        // Picture fields: a styled "Choose File" trigger (the native file input is visually
+        // hidden but still reachable via its <label for=...>, so it stays fully accessible)
+        // plus a preview of what's picked / already saved. The actual upload happens on save,
+        // not here — see uploadImageFields().
+        if (f.field_type === "image") {
+          var label2 = document.createElement("label");
+          label2.htmlFor = "field_" + f.key;
+          label2.innerHTML = fieldLabelHtml(f);
+          group.appendChild(label2);
+
+          var preview = document.createElement("div");
+          preview.id = "preview_" + f.key;
+          preview.style.marginBottom = ".4rem";
+          group.appendChild(preview);
+
+          var row = document.createElement("div");
+          row.className = "photo-field-row file-field";
+
+          var fileInput = document.createElement("input");
+          // No capture attribute: on phones it skips the photo library and forces the camera.
+          // The Take Photo button below is the camera option.
+          fileInput.type = "file"; fileInput.accept = "image/*";
+          fileInput.className = "visually-hidden-file";
+          fileInput.id = "field_" + f.key;
+          fileInput.dataset.fieldKey = f.key;
+          fileInput.dataset.fieldType = f.field_type;
+
+          var fileTrigger = document.createElement("label");
+          fileTrigger.className = "btn btn-outline-secondary btn-sm mb-0";
+          fileTrigger.htmlFor = fileInput.id;
+          fileTrigger.textContent = "Choose File";
+
+          var fileName = document.createElement("span");
+          fileName.className = "file-name";
+          fileName.id = "filename_" + f.key;
+          fileName.textContent = "No file chosen";
+
+          fileInput.addEventListener("change", function () {
+            var key = this.dataset.fieldKey;
+            var p = get("preview_" + key);
+            var nameEl = get("filename_" + key);
+            if (this.files && this.files[0]) {
+              nameEl.textContent = this.files[0].name;
+              p.innerHTML = '<img src="' + URL.createObjectURL(this.files[0]) + '" alt="Selected photo" style="height:70px;width:70px;object-fit:cover;border:1px solid var(--line);">' +
+                ' <small class="text-muted">New photo selected</small>';
+            } else {
+              nameEl.textContent = "No file chosen";
+            }
+          });
+          row.appendChild(fileTrigger);
+          row.appendChild(fileName);
+          row.appendChild(fileInput);
+
+          var camBtn = document.createElement("button");
+          camBtn.type = "button";
+          camBtn.className = "btn btn-outline-secondary btn-sm";
+          camBtn.innerHTML = '<i class="fa fa-camera"></i> Take Photo';
+          camBtn.addEventListener("click", function () { openCamera(f.key); });
+          row.appendChild(camBtn);
+
+          group.appendChild(row);
+          container.appendChild(group);
+          return;
+        }
+
+        // Everything else: a label plus a number box, slider, text box, or dropdown
+        var label = document.createElement("label");
+        label.htmlFor = "field_" + f.key;
+        label.innerHTML = fieldLabelHtml(f);
+        group.appendChild(label);
+
+        var input;
+        if (f.field_type === "slider") {
+          // Range input with a live numeric readout and low/high end labels, instead of a
+          // plain number box, for small bounded scales like shooting accuracy.
+          var sliderRow = document.createElement("div");
+          sliderRow.className = "slider-row";
+          input = document.createElement("input");
+          input.type = "range"; input.className = "form-control-range";
+          input.min = f.min_value != null ? f.min_value : 1;
+          input.max = f.max_value != null ? f.max_value : 5;
+          input.step = "1";
+          var sliderVal = document.createElement("span");
+          sliderVal.className = "slider-val";
+          var sliderClear = document.createElement("button");
+          sliderClear.type = "button"; sliderClear.className = "slider-clear"; sliderClear.textContent = "Clear";
+          sliderRow.appendChild(input);
+          sliderRow.appendChild(sliderVal);
+          sliderRow.appendChild(sliderClear);
+          group.appendChild(sliderRow);
+          setSliderState(input, false);
+          // click as well as input: tapping the thumb to confirm the middle value changes nothing,
+          // so it fires no input event, but it's still a deliberate answer
+          input.addEventListener("input", function () { setSliderState(this, true); });
+          input.addEventListener("click", function () { setSliderState(this, true); });
+          sliderClear.addEventListener("click", (function (el) {
+            return function () { setSliderState(el, false); };
+          })(input));
+          var scale = document.createElement("div");
+          scale.className = "slider-scale";
+          scale.innerHTML = "<span>" + esc(input.min) + " · Poor</span><span>" + esc(input.max) + " · Great</span>";
+          group.appendChild(scale);
+        } else if (f.field_type === "number") {
+          input = document.createElement("input");
+          input.type = "number"; input.step = "any"; input.className = "form-control";
+          if (f.min_value != null) input.min = f.min_value;
+          if (f.max_value != null) input.max = f.max_value;
+        } else if (f.field_type === "text") {
+          input = document.createElement("input");
+          input.type = "text"; input.className = "form-control";
+          input.maxLength = 500;
+        } else if (f.field_type === "choice") {
+          input = document.createElement("select");
+          input.className = "form-control";
+          var blank = document.createElement("option");
+          blank.value = ""; blank.textContent = "— select —";
+          input.appendChild(blank);
+          (f.options || []).forEach(function(opt) {
+            var o = document.createElement("option");
+            o.value = opt; o.textContent = opt;
+            input.appendChild(o);
+          });
+        }
+        input.id = "field_" + f.key;   // getFormValues / setFormValues find inputs by this id
+        input.dataset.fieldKey = f.key;
+        input.dataset.fieldType = f.field_type;
+        if (f.field_type !== "slider") group.appendChild(input);
+
+        // Spec fields (reg_limit set): a hidden warning that appears under the input the
+        // moment the value goes over the FRC limit — the value still saves either way.
+        if (f.reg_limit != null) {
+          var warn = document.createElement("div");
+          warn.className = "reg-warn";
+          warn.id = "regwarn_" + f.key;
+          warn.innerHTML = '<i class="fa fa-exclamation-triangle"></i> Exceeds the ' + esc(f.reg_limit) + ' limit — still saved, but flagged everywhere.';
+          group.appendChild(warn);
+          var checkReg = function () {
+            warn.style.display = overRegLimit(f, input.value) ? "" : "none";
+          };
+          input.addEventListener("input", checkReg);
+        }
+
+        // "Unsure" checkbox (number/slider fields with allow_unsure): disables and clears the
+        // input, and saves "<key>__unsure": true instead of a number.
+        if (f.allow_unsure && (f.field_type === "number" || f.field_type === "slider")) {
+          var unsureWrap = document.createElement("div");
+          unsureWrap.className = "custom-control custom-checkbox unsure-toggle";
+          var unsureCb = document.createElement("input");
+          unsureCb.type = "checkbox"; unsureCb.className = "custom-control-input";
+          unsureCb.id = "field_" + f.key + "__unsure";
+          unsureCb.dataset.unsureFor = f.key;
+          var unsureLabel = document.createElement("label");
+          unsureLabel.className = "custom-control-label";
+          unsureLabel.htmlFor = unsureCb.id;
+          unsureLabel.textContent = "Unsure";
+          unsureWrap.appendChild(unsureCb); unsureWrap.appendChild(unsureLabel);
+          unsureCb.addEventListener("change", function () {
+            input.disabled = this.checked;
+            if (this.checked) {
+              if (f.field_type === "slider") setSliderState(input, false); else input.value = "";
+              var w = get("regwarn_" + f.key); if (w) w.style.display = "none";
+            }
+          });
+          group.appendChild(unsureWrap);
+        }
+
+        // "Other" note box (choice fields with an "Other" option): hidden until Other is picked
+        if (hasOtherOption(f)) {
+          var noteWrap = document.createElement("div");
+          noteWrap.className = "other-note-wrap";
+          noteWrap.id = "notewrap_" + f.key;
+          var noteInput = document.createElement("input");
+          noteInput.type = "text"; noteInput.className = "form-control form-control-sm";
+          noteInput.maxLength = 300;
+          noteInput.placeholder = "Say more about \"Other\"…";
+          noteInput.id = "field_" + f.key + "__other_note";
+          noteInput.dataset.otherNoteFor = f.key;
+          noteWrap.appendChild(noteInput);
+          group.appendChild(noteWrap);
+          input.addEventListener("change", function () {
+            get("notewrap_" + f.key).style.display = this.value === "Other" ? "" : "none";
+          });
+        }
+
+        container.appendChild(group);
+      });
+      wireAutoTotals();
+    }
+
+    // ── FUEL total autofill ─────────────────────────────────────────
+    // Auto/teleop FUEL totals autofill from volley count x FUEL per volley. Editing the total
+    // directly "sticks" — it's left alone until one of the two inputs it's derived from changes
+    // again, at which point the total is recalculated and the manual value is overwritten.
+    var AUTO_TOTAL_RULES = {
+      auto_fuel_hub:   ["auto_volleys", "auto_fuel_per_volley"],
+      teleop_fuel_hub: ["teleop_volleys", "teleop_fuel_per_volley"]
+    };
+    var autoTotalManual = {};   // totalKey -> true once it's been hand-edited since the last dep change
+    function wireAutoTotals() {
+      Object.keys(AUTO_TOTAL_RULES).forEach(function (totalKey) {
+        var totalEl = get("field_" + totalKey);
+        var depKeys = AUTO_TOTAL_RULES[totalKey];
+        var depEls = depKeys.map(function (k) { return get("field_" + k); });
+        if (!totalEl || depEls.indexOf(null) !== -1) return;   // this tab doesn't have all three fields active
+
+        if (!(totalKey in autoTotalManual)) autoTotalManual[totalKey] = true;   // leave as-is until a dep changes
+        totalEl.addEventListener("input", function () { autoTotalManual[totalKey] = true; });
+        depEls.forEach(function (el) {
+          el.addEventListener("input", function () {
+            autoTotalManual[totalKey] = false;
+            var vals = depEls.map(function (e) { return parseFloat(e.value); });
+            if (!vals.some(isNaN)) totalEl.value = vals[0] * vals[1];
+          });
+        });
+      });
+    }
+
+    // Read the form into a { key: value } object. Blank boxes are left out; unchecked boxes save as false.
+    // Image fields are skipped here — their value comes from uploadImageFields() instead, since picking
+    // a file doesn't give us a value to save until it's actually uploaded.
+    function getFormValues() {
+      var data = {};
+      activeFields().forEach(function(f) {
+        if (f.field_type === "image") return;
+        if (f.field_type === "boolean") {
+          var cb = get("field_" + f.key);
+          data[f.key] = !!(cb && cb.checked);   // unchecked is saved as false
+          return;
+        }
+        if (f.allow_unsure && (f.field_type === "number" || f.field_type === "slider")) {
+          var unsureCb = get("field_" + f.key + "__unsure");
+          if (unsureCb && unsureCb.checked) { data[f.key + "__unsure"] = true; return; }
+        }
+        var el = get("field_" + f.key);
+        if (!el) return;
+        if (f.field_type === "slider" && !el.dataset.answered) return;   // untouched: no answer to save
+        var val = el.value.trim();
+        if (val !== "") data[f.key] = (f.field_type === "number" || f.field_type === "slider") ? parseFloat(val) : val;
+        // "Other" note: only kept when the choice is actually set to Other
+        if (hasOtherOption(f) && val === "Other") {
+          var noteEl = get("field_" + f.key + "__other_note");
+          var noteVal = noteEl ? noteEl.value.trim() : "";
+          if (noteVal) data[f.key + "__other_note"] = noteVal;
+        }
+      });
+      return data;
+    }
+
+    var PHOTO_MAX_BYTES = 10 * 1024 * 1024;
+
+    // Removes photo files the database has marked as no longer used (see photo_cleanup_paths() in
+    // rebuild_all.sql). Best effort: anything left over is picked up the next time this runs.
+    async function cleanUpPhotos() {
+      try {
+        var r = await sb.rpc("photo_cleanup_paths");
+        if (!r.error && r.data && r.data.length) await sb.storage.from("scouting-photos").remove(r.data);
+      } catch (e) { console.warn("Photo cleanup skipped:", e); }
+    }
+
+    // Upload any newly-picked photos for the active tab's image fields, and carry over the URL of
+    // any image field the scout didn't touch. existing is the data object being edited (or {} for new).
+    async function uploadImageFields(existing, team) {
+      var data = {};
+      var imageFields = activeFields().filter(function(f) { return f.field_type === "image"; });
+      for (var i = 0; i < imageFields.length; i++) {
+        var f = imageFields[i];
+        var el = get("field_" + f.key);
+        var file = el && el.files && el.files[0];
+        if (file) {
+          // Same limits as the bucket (section 9b of rebuild_all.sql), checked here for a clear message
+          if (file.size > PHOTO_MAX_BYTES) { toast(f.label + " is too large (10 MB max).", true); throw new Error("photo too large"); }
+          if (file.type && !/^image\/(jpeg|png|webp|heic|heif)$/.test(file.type)) {
+            toast(f.label + " must be a JPEG, PNG, WebP, or HEIC image.", true); throw new Error("photo type");
+          }
+          var ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8) || "jpg";
+          var path = currentEvent.id + "/" + mode + "/" + team + "/" + f.key + "-" + Date.now() + "." + ext;
+          var up = await sb.storage.from("scouting-photos").upload(path, file, { upsert: true, contentType: file.type });
+          if (up.error) {
+            // Photos can't wait in the offline draft queue, only the rest of a match entry can
+            toast(navigator.onLine === false
+              ? f.label + " can't be uploaded offline. Try again once you're back online."
+              : "Couldn't upload " + f.label + ": " + up.error.message, true);
+            throw up.error;
+          }
+          data[f.key] = sb.storage.from("scouting-photos").getPublicUrl(path).data.publicUrl;
+        } else if (existing && existing[f.key] != null) {
+          data[f.key] = existing[f.key];   // keep the photo that was already saved
+        }
+      }
+      return data;
+    }
+
+    // The reverse: put a saved { key: value } object back into the form (used when editing)
+    function setFormValues(data) {
+      data = data || {};
+      activeFields().forEach(function(f) {
+        if (f.field_type === "image") {
+          var p = get("preview_" + f.key);
+          if (p) {
+            p.innerHTML = data[f.key]
+              ? photoHtml(data[f.key], 70, "border:1px solid var(--line);")
+              : '<small class="text-muted">No photo saved yet</small>';
+          }
+          return;
+        }
+        if (f.field_type === "boolean") {
+          var cb = get("field_" + f.key);
+          if (cb) cb.checked = !!data[f.key];
+          return;
+        }
+        var el = get("field_" + f.key);
+        if (f.allow_unsure && (f.field_type === "number" || f.field_type === "slider")) {
+          var unsureCb = get("field_" + f.key + "__unsure");
+          var isUnsure = !!data[f.key + "__unsure"];
+          if (unsureCb) unsureCb.checked = isUnsure;
+          if (el) el.disabled = isUnsure;
+        }
+        if (el && data[f.key] != null) {
+          el.value = data[f.key];
+          var w = get("regwarn_" + f.key);
+          if (w) w.style.display = overRegLimit(f, el.value) ? "" : "none";
+        }
+        if (el && f.field_type === "slider") setSliderState(el, data[f.key] != null);
+        if (hasOtherOption(f)) {
+          var noteWrap = get("notewrap_" + f.key);
+          var noteEl = get("field_" + f.key + "__other_note");
+          if (noteWrap) noteWrap.style.display = (el && el.value === "Other") ? "" : "none";
+          if (noteEl) noteEl.value = data[f.key + "__other_note"] || "";
+        }
+      });
+    }
+
+    // Blank every dynamic field. Call this before setFormValues(), which only fills in the keys an
+    // entry has, so anything else left in the form would be saved onto the wrong entry.
+    function clearFields() {
+      activeFields().forEach(function(f) {
+        if (f.field_type === "image") {
+          var el = get("field_" + f.key);
+          if (el) el.value = "";
+          var p = get("preview_" + f.key);
+          if (p) p.innerHTML = "";
+          var nameEl = get("filename_" + f.key);
+          if (nameEl) nameEl.textContent = "No file chosen";
+          return;
+        }
+        if (f.field_type === "boolean") {
+          var cb = get("field_" + f.key);
+          if (cb) cb.checked = false;
+        } else {
+          var el2 = get("field_" + f.key);
+          if (el2) {
+            el2.disabled = false;
+            if (f.field_type === "slider") setSliderState(el2, false);
+            else el2.value = "";
+          }
+          if (f.allow_unsure) {
+            var unsureCb = get("field_" + f.key + "__unsure");
+            if (unsureCb) unsureCb.checked = false;
+          }
+          var w = get("regwarn_" + f.key);
+          if (w) w.style.display = "none";
+          if (hasOtherOption(f)) {
+            var noteWrap = get("notewrap_" + f.key);
+            if (noteWrap) noteWrap.style.display = "none";
+            var noteEl = get("field_" + f.key + "__other_note");
+            if (noteEl) noteEl.value = "";
+          }
+        }
+      });
+    }
+
+    // Clear the form and return it to "new entry" state
+    function resetEntryForm() {
+      get("fTeam").value = ""; get("fMatch").value = "";
+      autoTotalManual = {};   // fresh entry: FUEL totals should autofill again once typed into
+      clearFields();
+      editingId = null;
+      get("entryId").value = "";
+      get("entryFormTitle").textContent = mode === "pit" ? "New Pit Entry" : "New Match Entry";
+      get("entrySave").textContent = mode === "pit" ? "Save Pit Entry" : "Save Entry";
+      get("entryCancel").classList.add("d-none");
+      prefillKeys = new Set(); touchedFields = new Set(); editHadPrefill = false;
+      clearVisionNotes();
+    }
+
+    // ── Tabs ─────────────────────────────────────────────────────────
+    // Switch between Match and Pit: rebuild the form for that scope and redraw the table
+    function setMode(m) {
+      mode = m;
+      document.querySelectorAll(".scout-tab").forEach(function(b) {
+        b.classList.toggle("active", b.dataset.mode === m);
+        b.setAttribute("aria-selected", b.dataset.mode === m ? "true" : "false");
+      });
+      get("matchGroup").style.display = m === "match" ? "" : "none";
+      get("draftIndicator").style.display = "none";
+      get("entriesHeading").textContent = m === "pit" ? "Pit entries" : "Entries";
+      buildForm();
+      resetEntryForm();
+      renderEntries();
+    }
+    document.querySelectorAll(".scout-tab").forEach(function(btn) {
+      btn.addEventListener("click", function () { setMode(btn.dataset.mode); });
+    });
+
+    get("entryCancel").addEventListener("click", resetEntryForm);
+
+    // In pit mode, typing a team that already has a pit entry loads it for editing
+    get("fTeam").addEventListener("change", function () {
+      if (mode !== "pit") return;
+      var t = wholeNumber(this.value);
+      var existing = allPit.find(function(e){ return e.team_number === t; });
+      // Moved off a loaded entry: its answers must not carry over to a different team
+      if (editingId && !existing) {
+        var typed = this.value;
+        resetEntryForm();
+        this.value = typed;
+        return;
+      }
+      editingId = existing ? existing.id : null;
+      if (existing) {
+        clearFields();
+        setFormValues(existing.data);
+        get("entryFormTitle").textContent = "Editing pit entry – Team " + t;
+        get("entryCancel").classList.remove("d-none");
+        toast("Loaded existing pit entry for team " + t + ".");
+      }
+    });
+
+    // Match entry query: staff see everyone's entries; students only see their own
+    var entryQuery = isStaff
+      ? function(evId) { return sb.from("scouting_entries").select("*").eq("event_id", evId).order("created_at", { ascending: false }).limit(1000); }
+      : function(evId) { return sb.from("scouting_entries").select("*").eq("event_id", evId).eq("scouted_by", s.user.id).order("created_at", { ascending: false }).limit(200); };
+
+    get("entrySearch").addEventListener("input", function() {
+      filterVal = this.value.trim();
+      renderEntries();
+    });
+
+    // Load match and pit entries for the current event (in parallel), then redraw
+    async function loadEntries() {
+      if (!currentEvent) return;
+      var evId = currentEvent.id;
+      var results = await Promise.all([
+        quick(entryQuery(evId), 20000),
+        quick(sb.from("pit_entries").select("*").eq("event_id", evId).order("team_number", { ascending: true }), 20000)
+      ]);
+      // Switched events while this was loading: a newer load owns the tables now
+      if (!currentEvent || currentEvent.id !== evId) return;
+      if (results[0].error && isNetworkError(results[0])) {
+        toast("Offline: saved entries will show once you reconnect. New match entries are kept on this device.");
+        return;
+      }
+      if (results[0].error) toast("Couldn't load match entries.", true);
+      else allEntries = results[0].data;
+      if (results[1].error) toast("Couldn't load pit entries.", true);
+      else allPit = results[1].data;
+      renderEntries();
+      renderShift();
+    }
+
+    // True if the entry's team number contains whatever is typed in the filter box
+    function matchesFilter(entry) {
+      return !filterVal || String(entry.team_number).includes(filterVal);
+    }
+
+    function renderEntries() {
+      if (mode === "pit") renderPitTable(); else renderMatchTable();
+    }
+
+    // Draw the match table: one column per active match field, plus team, match, and actions
+    // Shared cell renderer for both tables: "Unsure", the choice's "Other" note, and an
+    // over-the-limit flag on spec fields all need the same treatment whether it's a match row
+    // or a pit row.
+    function cellHtml(entry, f) {
+      var d = entry.data || {};
+      if (f.allow_unsure && d[f.key + "__unsure"]) return "Unsure";
+      var v = d[f.key];
+      if (v == null || v === "") return "—";
+      if (f.field_type === "boolean") return v ? "Yes" : "No";
+      if (f.field_type === "image") return photoHtml(v, 32);
+      var html = esc(v);
+      if (hasOtherOption(f) && v === "Other" && d[f.key + "__other_note"]) {
+        html += ' <small class="text-muted">(' + esc(d[f.key + "__other_note"]) + ')</small>';
+      }
+      if (overRegLimit(f, v)) html += ' <span class="reg-flag" title="Exceeds the ' + esc(f.reg_limit) + ' limit">Over limit</span>';
+      return html;
+    }
+
+    function renderMatchTable() {
+      var thead = document.querySelector("#entryTable thead");
+      var tbody = document.querySelector("#entryTable tbody");
+      var list = activeFields();
+
+      if (!allEntries.length) {
+        thead.innerHTML = ""; tbody.innerHTML = '<tr><td class="text-muted text-center py-3">No match entries yet for this event.</td></tr>';
+        get("entriesHeading").textContent = "Entries";
+        return;
+      }
+
+      var cols = ["Team #", "Match #"].concat(list.map(function(f){ return f.label; })).concat(["Actions"]);
+      thead.innerHTML = "<tr>" + cols.map(function(c){ return "<th>" + esc(c) + "</th>"; }).join("") + "</tr>";
+
+      var userId = s.user.id;
+      var filtered = allEntries.filter(matchesFilter);
+      tbody.innerHTML = filtered.map(function(entry) {
+        var cells = [entry.team_number, entry.match_number || "—"];
+        list.forEach(function(f) { cells.push(cellHtml(entry, f)); });
+        // Staff can change any entry; students only the ones they scouted
+        var canEdit = isStaff || entry.scouted_by === userId;
+        var actions = canEdit
+          ? '<button class="btn-icon mr-1" title="Edit entry" aria-label="Edit entry" onclick="editEntry(\'' + entry.id + '\')"><i class="fa fa-pencil"></i></button>' +
+            '<button class="btn-icon danger" title="Delete entry" aria-label="Delete entry" onclick="deleteEntry(\'' + entry.id + '\')"><i class="fa fa-trash"></i></button>'
+          : '<span class="text-muted" style="font-size:.75rem;">—</span>';
+        cells.push(actions);
+        return "<tr>" + cells.map(function(c){ return "<td>" + c + "</td>"; }).join("") + "</tr>";
+      }).join("") || '<tr><td colspan="' + cols.length + '" class="text-muted text-center py-3">No entries match that team number.</td></tr>';
+
+      get("entriesHeading").textContent = "Entries (" + allEntries.length + ")";
+    }
+
+    // Draw the pit table (same idea, one row per team, no match number)
+    function renderPitTable() {
+      var thead = document.querySelector("#entryTable thead");
+      var tbody = document.querySelector("#entryTable tbody");
+      var list = activeFields();
+
+      if (!allPit.length) {
+        thead.innerHTML = ""; tbody.innerHTML = '<tr><td class="text-muted text-center py-3">No pit entries yet for this event.</td></tr>';
+        get("entriesHeading").textContent = "Pit entries";
+        return;
+      }
+
+      var cols = ["Team #"].concat(list.map(function(f){ return f.label; })).concat(["Actions"]);
+      thead.innerHTML = "<tr>" + cols.map(function(c){ return "<th>" + esc(c) + "</th>"; }).join("") + "</tr>";
+
+      var filtered = allPit.filter(matchesFilter);
+      tbody.innerHTML = filtered.map(function(entry) {
+        var cells = [entry.team_number];
+        list.forEach(function(f) { cells.push(cellHtml(entry, f)); });
+        // Pit data is shared by the team, so any member can edit it
+        cells.push(
+          '<button class="btn-icon mr-1" title="Edit pit entry" aria-label="Edit pit entry" onclick="editPit(\'' + entry.id + '\')"><i class="fa fa-pencil"></i></button>' +
+          '<button class="btn-icon danger" title="Delete pit entry" aria-label="Delete pit entry" onclick="deletePit(\'' + entry.id + '\')"><i class="fa fa-trash"></i></button>'
+        );
+        return "<tr>" + cells.map(function(c){ return "<td>" + c + "</td>"; }).join("") + "</tr>";
+      }).join("") || '<tr><td colspan="' + cols.length + '" class="text-muted text-center py-3">No pit entries match that team number.</td></tr>';
+
+      get("entriesHeading").textContent = "Pit entries (" + allPit.length + ")";
+    }
+
+    // ── Save ─────────────────────────────────────────────────────────
+    // One save at a time: a double-tap on a slow connection would otherwise record the entry twice
+    var saving = false;
+    get("entrySave").addEventListener("click", async function () {
+      if (!currentEvent || saving) return;
+      var btn = this;
+      saving = true; btn.disabled = true;
+      try { await saveEntry(); }
+      finally { saving = false; btn.disabled = false; }
+    });
+
+    async function saveEntry() {
+      // Uploads can take a while, so hold on to what this save is for in case the tab or event changes
+      var saveMode = mode, saveEvent = currentEvent, editId = editingId;
+      var team = wholeNumber(get("fTeam").value);
+      if (!(team >= 1 && team <= 99999)) { toast("Enter a valid team number.", true); return; }
+      var match = null;
+      if (saveMode === "match" && get("fMatch").value !== "") {
+        match = wholeNumber(get("fMatch").value);
+        if (!(match >= 1 && match <= 999)) { toast("Enter a match number from 1 to 999.", true); return; }
+      }
+
+      // Existing saved data for the row being edited, so a required photo already on file
+      // doesn't get rejected just because no new file was picked this time.
+      var existingData = {};
+      var existingPit = null;
+      if (saveMode === "pit") {
+        existingPit = allPit.find(function(e){ return e.team_number === team; }) || null;
+        existingData = (existingPit && existingPit.data) || {};
+      } else if (editId) {
+        var existingMatch = allEntries.find(function(e){ return e.id === editId; });
+        existingData = (existingMatch && existingMatch.data) || {};
+      }
+
+      // Validate required fields on the active tab (checkboxes are never "missing")
+      var list = activeFields();
+      for (var i = 0; i < list.length; i++) {
+        var f = list[i];
+        if (f.required && f.field_type === "image") {
+          var fileEl = get("field_" + f.key);
+          var hasFile = fileEl && fileEl.files && fileEl.files[0];
+          if (!hasFile && !existingData[f.key]) { toast(f.label + " is required.", true); return; }
+          continue;
+        }
+        if (!f.required || f.field_type === "boolean") continue;
+        if (f.allow_unsure) {
+          var unsureCb = get("field_" + f.key + "__unsure");
+          if (unsureCb && unsureCb.checked) continue;   // "Unsure" is a valid answer
+        }
+        var el = get("field_" + f.key);
+        if (!el || el.value.trim() === "" || (f.field_type === "slider" && !el.dataset.answered)) {
+          toast(f.label + " is required.", true); return;
+        }
+      }
+
+      var data = getFormValues();
+      var imageData;
+      try { imageData = await uploadImageFields(existingData, team); }
+      catch (e) { return; }   // uploadImageFields already showed a toast
+      Object.assign(data, imageData);
+
+      if (saveMode === "pit") { await savePit(team, data, saveEvent, existingPit); return; }
+
+      // Match entry: update the existing row when editing, otherwise insert a new one
+      var payload = { id: newId(), event_id: saveEvent.id, team_number: team, match_number: match,
+                      data: data, scouted_by: s.user.id };
+      var patch = { team_number: team, match_number: match, data: data };
+      // Only sent when there is one, so saving still works before the prefilled column exists
+      if (prefillKeys.size) payload.prefilled = Array.from(prefillKeys);
+      if (prefillKeys.size || editHadPrefill) patch.prefilled = prefillKeys.size ? Array.from(prefillKeys) : null;
+
+      var r;
+      if (editId) {
+        r = await quick(sb.from("scouting_entries").update(patch).eq("id", editId).select("id"));
+      } else {
+        r = await quick(sb.from("scouting_entries").insert(payload));
+      }
+
+      if (r.error) {
+        // Offline: save as draft, and clear the form so the same entry can't be queued twice
+        if (isNetworkError(r)) {
+          queueDraft(editId ? { editId: editId, patch: patch } : payload);
+          resetEntryForm();
+          get("draftIndicator").style.display = "flex";
+          renderShift();
+          toast("No connection — saved as draft.");
+        } else {
+          toast(r.error.message || "Couldn't save entry.", true);
+        }
+        return;
+      }
+      // Row security hides a blocked update as "0 rows changed", not as an error
+      if (editId && !r.data.length) { toast("Couldn't update this entry. You may no longer have access to it.", true); return; }
+      toast(editId ? "Entry updated." : "Entry saved.");
+      resetEntryForm();
+      loadEntries();
+      if (editId) cleanUpPhotos();
+    }
+
+    // Pit entries have no draft queue: they're saved straight to the server. There's one shared
+    // row per team, so check nobody else saved over it since this page loaded it.
+    async function savePit(team, data, saveEvent, loaded) {
+      var cur = await sb.from("pit_entries").select("updated_at")
+        .eq("event_id", saveEvent.id).eq("team_number", team).maybeSingle();
+      if (cur.data && (!loaded || cur.data.updated_at !== loaded.updated_at)) {
+        if (!(await RSDialog.confirm("Someone else saved a pit entry for team " + team + " after this page loaded it. " +
+            "Replace theirs with yours? Cancel goes back without saving.", { title: "Pit entry changed", ok: "Replace theirs" }))) {
+          loadEntries();
+          return;
+        }
+      }
+      var payload = { event_id: saveEvent.id, team_number: team, data: data,
+                      scouted_by: s.user.id, updated_at: new Date().toISOString() };
+      // One pit entry per team per event: insert, or overwrite the existing one
+      var r = await sb.from("pit_entries").upsert(payload, { onConflict: "event_id,team_number" });
+      if (r.error) {
+        toast(isNetworkError(r) ? "No connection — pit entry not saved. Try again once you're back online."
+                                : (r.error.message || "Couldn't save pit entry."), true);
+        return;
+      }
+      toast("Pit entry saved.");
+      resetEntryForm();
+      loadEntries();
+      cleanUpPhotos();
+    }
+
+    // ── Edit / delete ────────────────────────────────────────────────
+    // These are attached to window because the table buttons call them from inline onclick attributes.
+    window.editEntry = function(id) {
+      var entry = allEntries.find(function(e){ return e.id === id; });
+      if (!entry) return;
+      if (mode !== "match") setMode("match");
+      get("fTeam").value = entry.team_number;
+      get("fMatch").value = entry.match_number || "";
+      clearFields();
+      setFormValues(entry.data);
+      editingId = id;
+      prefillKeys = new Set(entry.prefilled || []); touchedFields = new Set();
+      editHadPrefill = prefillKeys.size > 0;
+      clearVisionNotes();
+      get("entryId").value = id;
+      get("entryFormTitle").textContent = "Edit Entry – Team " + entry.team_number;
+      get("entrySave").textContent = "Save Entry";
+      get("entryCancel").classList.remove("d-none");
+      get("entryFormCard").scrollIntoView({ behavior: "smooth" });
+    };
+
+    window.deleteEntry = async function(id) {
+      if (!(await RSDialog.confirm("Delete this match entry?", { title: "Delete entry", ok: "Delete", danger: true }))) return;
+      var r = await sb.from("scouting_entries").delete().eq("id", id).select("id");
+      if (r.error || !r.data.length) { toast("Couldn't delete entry.", true); return; }
+      toast("Entry deleted.");
+      loadEntries();
+      cleanUpPhotos();
+    };
+
+    window.editPit = function(id) {
+      var entry = allPit.find(function(e){ return e.id === id; });
+      if (!entry) return;
+      if (mode !== "pit") setMode("pit");
+      get("fTeam").value = entry.team_number;
+      clearFields();
+      setFormValues(entry.data);
+      editingId = id;
+      get("entryFormTitle").textContent = "Editing pit entry – Team " + entry.team_number;
+      get("entrySave").textContent = "Save Pit Entry";
+      get("entryCancel").classList.remove("d-none");
+      get("entryFormCard").scrollIntoView({ behavior: "smooth" });
+    };
+
+    window.deletePit = async function(id) {
+      if (!(await RSDialog.confirm("Delete this pit entry?", { title: "Delete pit entry", ok: "Delete", danger: true }))) return;
+      var r = await sb.from("pit_entries").delete().eq("id", id).select("id");
+      if (r.error || !r.data.length) { toast("Couldn't delete pit entry.", true); return; }
+      toast("Pit entry deleted.");
+      loadEntries();
+      cleanUpPhotos();
+    };
+
+    // Back online: send waiting drafts, then load the entries lists that couldn't load offline
+    window.addEventListener("online", function() {
+      flushDrafts().then(function () { loadEntries(); });
+    });
+
+    // ── Scout Shifts: your next match ───────────────────────────────
+    // Staff hand out seats on shifts.html. The banner names the next match in your shifts that
+    // you haven't entered yet, and fills the team and match in. A copy is kept on this device
+    // with the events and form, so it works offline too.
+    var shiftInfo = null;   // { eventId, shifts: [your shifts], matches: [their qual matches] }
+    function qualOf(key) { var k = RSSchedule.parseKey(key); return k && k.level === "qm" ? k.n : null; }
+    function inShift(sh, n) { return n >= sh.first_match && n <= sh.last_match; }
+    async function loadShift() {
+      if (!currentEvent) return;
+      var evId = currentEvent.id;
+      var res = await Promise.all([
+        quick(sb.from("scout_shifts").select("station,first_match,last_match,note").eq("event_id", evId).eq("user_id", s.user.id), 10000),
+        quick(RSSchedule.load(sb, evId), 15000)
+      ]);
+      if (!currentEvent || currentEvent.id !== evId) return;
+      var saved = offlineCopy().shift;
+      if (res[0].error || res[1].error) {
+        shiftInfo = isNetworkError(res[0]) && saved && saved.eventId === evId ? saved : null;
+      } else {
+        var mine = res[0].data || [];
+        var matches = (res[1].matches || []).filter(function (m) {
+          var n = qualOf(m.match_key);
+          return n != null && mine.some(function (sh) { return inShift(sh, n); });
+        }).map(function (m) { return { match_key: m.match_key, red_teams: m.red_teams, blue_teams: m.blue_teams, played: m.played }; });
+        shiftInfo = { eventId: evId, shifts: mine, matches: matches };
+        keepOffline("shift", shiftInfo);
+      }
+      renderShift();
+    }
+    // The earliest match in your shifts you haven't entered (or queued), from the last played one on
+    function nextShiftMatch() {
+      if (!shiftInfo || !shiftInfo.shifts.length) return null;
+      var done = new Set(allEntries.filter(function (e) { return e.scouted_by === s.user.id; })
+        .concat(getDrafts().filter(function (d) { return !d.editId; }))
+        .map(function (e) { return e.match_number + "|" + e.team_number; }));
+      var played = shiftInfo.matches.filter(function (m) { return m.played; }).map(function (m) { return qualOf(m.match_key); });
+      var lastPlayed = played.length ? Math.max.apply(null, played) : 0;
+      for (var i = 0; i < shiftInfo.matches.length; i++) {
+        var m = shiftInfo.matches[i], n = qualOf(m.match_key);
+        if (n < lastPlayed) continue;
+        var sh = shiftInfo.shifts.find(function (x) { return inShift(x, n); });
+        var team = sh ? RSSchedule.teamAt(m, sh.station) : null;
+        if (team && !done.has(n + "|" + team)) return { n: n, team: team, shift: sh, played: m.played };
+      }
+      return null;
+    }
+    function renderShift() {
+      var box = get("shiftBanner");
+      if (!shiftInfo || !shiftInfo.shifts.length) { box.style.display = "none"; return; }
+      var next = nextShiftMatch(), sh = next ? next.shift : shiftInfo.shifts[0];
+      box.className = "shift-banner " + sh.station.slice(0, -1);
+      box.style.display = "";
+      box.innerHTML = next
+        ? "<span>Your seat: <strong>" + esc(RSSchedule.stationLabel(sh.station)) + "</strong>, quals " + sh.first_match + "–" + sh.last_match + "</span>" +
+          "<span>Next: <strong>Qual " + next.n + "</strong>, team <strong>" + next.team + "</strong>" + (next.played ? " (played)" : "") + "</span>" +
+          '<button type="button" class="btn btn-primary" id="shiftFill">Fill in</button>' +
+          '<a class="small" href="/shifts.html">All shifts</a>'
+        : "<span>You've entered every match in your shifts so far.</span>" + '<a class="small" href="/shifts.html">All shifts</a>';
+      var btn = get("shiftFill");
+      if (btn) btn.addEventListener("click", function () { startEntry(next.team, next.n); });
+    }
+    // A fresh match entry for this team and match (from the banner, or a ?team=&match= link)
+    function startEntry(team, match) {
+      if (mode !== "match") setMode("match"); else resetEntryForm();
+      get("fTeam").value = team || "";
+      get("fMatch").value = match || "";
+      applyVision();
+      get("entryFormCard").scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    // ── Vision pre-fill ─────────────────────────────────────────────
+    // Once vision has agreed with this event's scouts often enough on a field (js/visioncheck.js,
+    // explained on ratings.html#vision-prefill), a new entry starts with vision's answer for it,
+    // marked so the scout checks it. The entry records which fields were filled that way.
+    var visionCheck = null, visionRows = {};
+    async function loadVision() {
+      if (!currentEvent) return;
+      var evId = currentEvent.id;
+      var res = await Promise.all([
+        quick(RSRatings.pagedRows(function () {
+          return sb.from("vision_robots").select("match_key,team_number,data,confidence").eq("event_id", evId).order("match_key").order("team_number");
+        }), 20000),
+        quick(RSRatings.pagedRows(function () {
+          return sb.from("scouting_entries").select("team_number,match_number,data,prefilled").eq("event_id", evId).order("id");
+        }), 20000)
+      ]);
+      if (!currentEvent || currentEvent.id !== evId) return;
+      if (res[0].error || res[1].error) return;   // optional: the form works the same without it
+      visionRows = {};
+      res[0].data.forEach(function (v) { visionRows[v.match_key + "|" + v.team_number] = v; });
+      visionCheck = {};
+      RSVisionCheck.compare(res[1].data.filter(RSRatings.isThisSeason), res[0].data).forEach(function (c) { visionCheck[c.key] = c; });
+    }
+    function clearVisionNotes() {
+      document.querySelectorAll(".vision-filled, .vision-hint").forEach(function (el) { el.remove(); });
+    }
+    function applyVision() {
+      clearVisionNotes();
+      // A field vision filled in earlier and the scout never touched goes back to blank
+      prefillKeys.forEach(function (k) {
+        var el = get("field_" + k);
+        if (el && el.type === "checkbox") el.checked = false;
+      });
+      prefillKeys = new Set();
+      if (mode !== "match" || editingId || !visionCheck) return;
+      var team = wholeNumber(get("fTeam").value), match = wholeNumber(get("fMatch").value);
+      var v = visionRows["qm" + match + "|" + team];
+      if (!v || !v.data || Number(v.confidence) < RSVision.LOW_CONFIDENCE) return;
+      RSVisionCheck.CHECKS.forEach(function (c) {
+        var stats = visionCheck[c.key], value = c.vision(v.data);
+        if (!stats || !stats.ready || value == null) return;
+        var pct = Math.round(stats.share * 100) + "%";
+        if (c.prefill) {
+          var el = get("field_" + c.prefill);
+          if (!el || el.type !== "checkbox" || touchedFields.has(c.prefill)) return;
+          el.checked = value;
+          prefillKeys.add(c.prefill);
+          var note = document.createElement("div");
+          note.className = "vision-filled";
+          note.innerHTML = '<i class="fa fa-eye"></i> Filled in from vision (it agrees with scouts here ' + pct + " of the time). Check it.";
+          el.closest(".form-group").appendChild(note);
+        } else if (c.key === "fuel") {
+          var total = get("field_teleop_fuel_hub");
+          if (!total) return;
+          var hint = document.createElement("div");
+          hint.className = "vision-hint";
+          hint.innerHTML = '<i class="fa fa-eye"></i> Vision estimate: about ' + Math.round(value) + " FUEL in the whole match, AUTO and teleop together (within " +
+            Math.round(RSVisionCheck.fuelTolerance(value)) + " of the scouts " + pct + " of the time).";
+          total.closest(".form-group").appendChild(hint);
+        }
+      });
+    }
+    // A field the scout changes is theirs: it's no longer marked as filled in from vision
+    get("dynamicFields").addEventListener("change", function (e) {
+      var key = e.target.dataset && e.target.dataset.fieldKey;
+      if (!key) return;
+      touchedFields.add(key);
+      if (prefillKeys.delete(key)) {
+        var note = e.target.closest(".form-group").querySelector(".vision-filled");
+        if (note) note.remove();
+      }
+    });
+    ["fTeam", "fMatch"].forEach(function (id) {
+      get(id).addEventListener("change", function () { if (mode === "match") applyVision(); });
+    });
+
+    // ── QR hand-off ─────────────────────────────────────────────────
+    // A scout with no connection shows their waiting new entries as QR codes; a scout who is
+    // online scans them, and relay_scouting_entry() saves each one as the first scout's, with
+    // its own id, so it can't be saved twice when the first device reconnects.
+    var JSQR_URL = "https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js";
+    var JSQR_SRI = "sha384-b5Ya4Bq3qCyz39m2ISh+4DxjAIljdeFwK/BsXLuj9gugaNwAcj/ia15fxNZL9Nlx";
+    var qrList = [], qrIdx = 0;
+    // The code carries plain ASCII, so any other character goes in as a \u escape
+    function asciiJson(obj) {
+      return JSON.stringify(obj).replace(/[\u007f-￿]/g, function (c) { return "\\u" + ("000" + c.charCodeAt(0).toString(16)).slice(-4); });
+    }
+    function drawQr() {
+      var d = qrList[qrIdx], box = get("qrCode");
+      box.innerHTML = "";
+      var text = "RS1:" + asciiJson({ id: d.id, event_id: d.event_id, team_number: d.team_number, match_number: d.match_number,
+        data: d.data, scouted_by: d.scouted_by, prefilled: d.prefilled || null });
+      if (typeof QRCode === "undefined") {
+        box.textContent = "The QR code maker didn't load. Open this page once with a connection so it's saved for offline use.";
+      } else {
+        try { new QRCode(box, { text: text, width: 280, height: 280, correctLevel: QRCode.CorrectLevel.L }); }
+        catch (e) { box.textContent = "This entry is too long for one QR code. It will send once this device is online."; }
+      }
+      get("qrCaption").textContent = "Team " + d.team_number + ", match " + (d.match_number || "—") + " · " + (qrIdx + 1) + " of " + qrList.length;
+      get("qrPrev").disabled = qrIdx === 0;
+      get("qrNext").disabled = qrIdx === qrList.length - 1;
+    }
+    get("showQr").addEventListener("click", function () {
+      qrList = getDrafts().filter(function (d) { return !d.editId && d.id; });
+      if (!qrList.length) { toast("Only new entries can be handed off. Edits wait for this device to get a connection.", true); return; }
+      qrIdx = 0;
+      drawQr();
+      $("#qrModal").modal("show");
+    });
+    get("qrPrev").addEventListener("click", function () { if (qrIdx > 0) { qrIdx--; drawQr(); } });
+    get("qrNext").addEventListener("click", function () { if (qrIdx < qrList.length - 1) { qrIdx++; drawQr(); } });
+
+    var scanStream = null, scanTimer = null, scanSeen = new Set(), scanRequest = 0;
+    function scanStatus(text) { get("scanStatus").textContent = text; }
+    function scanLog(text) { var li = document.createElement("li"); li.textContent = text; get("scanLog").appendChild(li); }
+    function loadScript(src, sri) {
+      return new Promise(function (resolve, reject) {
+        var el = document.createElement("script");
+        el.src = src; el.integrity = sri; el.crossOrigin = "anonymous";
+        el.onload = resolve; el.onerror = reject;
+        document.head.appendChild(el);
+      });
+    }
+    // The browser's own QR reader where there is one (Chrome, Android), otherwise jsQR
+    async function qrDecoder() {
+      if ("BarcodeDetector" in window) {
+        try {
+          var formats = await BarcodeDetector.getSupportedFormats();
+          if (formats.indexOf("qr_code") !== -1) {
+            var det = new BarcodeDetector({ formats: ["qr_code"] });
+            return async function (video) {
+              if (video.readyState < 2) return null;
+              var codes = await det.detect(video);
+              return codes.length ? codes[0].rawValue : null;
+            };
+          }
+        } catch (e) {}
+      }
+      if (!window.jsQR) { try { await loadScript(JSQR_URL, JSQR_SRI); } catch (e) {} }
+      if (!window.jsQR) return null;
+      var canvas = document.createElement("canvas"), ctx = canvas.getContext("2d", { willReadFrequently: true });
+      return async function (video) {
+        if (video.readyState < 2 || !video.videoWidth) return null;
+        var w = Math.min(640, video.videoWidth), h = Math.round(video.videoHeight * w / video.videoWidth);
+        canvas.width = w; canvas.height = h;
+        ctx.drawImage(video, 0, 0, w, h);
+        var code = window.jsQR(ctx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: "dontInvert" });
+        return code ? code.data : null;
+      };
+    }
+    async function handleScan(text) {
+      if (text.indexOf("RS1:") !== 0 || scanSeen.has(text)) return;
+      scanSeen.add(text);
+      var entry;
+      try { entry = JSON.parse(text.slice(4)); } catch (e) { scanLog("That code isn't a 1307scout entry."); return; }
+      var what = "Team " + entry.team_number + ", match " + (entry.match_number || "—");
+      var r = await sb.rpc("relay_scouting_entry", { p_entry: entry });
+      if (r.error) { scanSeen.delete(text); scanLog(what + ": couldn't save (" + r.error.message + ")."); return; }
+      scanLog(what + ": " + (r.data === "already saved" ? "already saved." : "saved."));
+      loadEntries();
+    }
+    function stopScanner() {
+      scanRequest++;
+      clearInterval(scanTimer); scanTimer = null;
+      if (scanStream) { scanStream.getTracks().forEach(function (t) { t.stop(); }); scanStream = null; }
+    }
+    $("#scanModal").on("hidden.bs.modal", stopScanner);
+    get("scanQr").addEventListener("click", async function () {
+      if (navigator.onLine === false) { toast("This device needs a connection to save scanned entries.", true); return; }
+      var request = ++scanRequest;
+      get("scanLog").innerHTML = "";
+      scanStatus("Starting the camera…");
+      $("#scanModal").modal("show");
+      var stream;
+      try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }); }
+      catch (e) { scanStatus("Couldn't open the camera (" + e.message + ")."); return; }
+      if (request !== scanRequest) { stream.getTracks().forEach(function (t) { t.stop(); }); return; }
+      scanStream = stream;
+      get("scanVideo").srcObject = stream;
+      var decode = await qrDecoder();
+      if (request !== scanRequest) return;
+      if (!decode) { scanStatus("Couldn't load the QR reader. Check the connection and try again."); return; }
+      scanStatus("Point the camera at the code. Each entry saves as soon as it's read.");
+      var busy = false;
+      scanTimer = setInterval(async function () {
+        if (busy) return;
+        busy = true;
+        try { var text = await decode(get("scanVideo")); if (text) await handleScan(text); }
+        catch (e) {}
+        finally { busy = false; }
+      }, 300);
+    });
+
+    // ── Boot ─────────────────────────────────────────────────────────
+    // Both requests go out together. Fields are applied first (the form needs them), then events
+    // (which triggers loading entries), then any waiting drafts.
+    // .then() is what sends a supabase-js request, so call it now rather than when awaited
+    var eventsReq = sb.from("events").select("*").order("event_date", { ascending: false, nullsFirst: false })
+      .then(function (r) { return r; });
+    var usingOfflineCopy = false;   // set by loadFields/loadEvents when they used the copy on this device
+    await loadFields();
+    await loadEvents(eventsReq);
+    if (usingOfflineCopy) toast("Offline: using the form and events saved on this device.");
+    // A link from Scout Shifts: /scout.html?team=1234&match=16 starts that entry
+    var linkParams = new URLSearchParams(location.search);
+    if (linkParams.get("team") || linkParams.get("match")) {
+      history.replaceState(null, "", location.pathname);
+      if (currentEvent) startEntry(wholeNumber(linkParams.get("team")) || "", wholeNumber(linkParams.get("match")) || "");
+    }
+    flushDrafts();
+    cleanUpPhotos();
+
+    // event_date has no time zone. Format it in UTC so it doesn't shift to the previous day.
+    function fmtEventDate(d, opts) {
+     if (!d) return "—";
+     return new Date(String(d).slice(0, 10) + "T00:00:00Z")
+      .toLocaleDateString("en-US", Object.assign({ timeZone: "UTC" }, opts));
+    }
+  })();
+  </script>
+</body>
+</html>

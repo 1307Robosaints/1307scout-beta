@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>window.RS_BUILD = {"version":"0.0.5+7eca554","channel":"experimental","commit":"7eca554","site":"beta"};</script>
+  <link rel="icon" href="/img/robosaintslogo.png">
+  <!-- 1307scout app (PWA): see /js/pwa.js and /sw.js -->
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#0A2352">
+  <link rel="apple-touch-icon" href="/img/app/apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="1307scout β">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <title>My Account – 1307scout</title>
+  <!-- Open connections early to the hosts this page needs before it can draw or load data -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="preconnect" href="https://nyanwljgsazwuzmnlrcz.supabase.co" crossorigin>
+  <!-- Light/dark theme, before the stylesheets so a dark page never flashes white -->
+  <script src="/js/theme.js"></script>
+  <link href="/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="/css/modern.css" rel="stylesheet">
+  <style>
+    .account-wrap { max-width: 640px; margin: 2.5rem auto; padding: 0 1rem; }
+    .account-card {
+      background: var(--white);
+      border: 1px solid var(--line);
+      border-top: 3px solid var(--blue);
+      padding: 2rem;
+      margin-bottom: 1.5rem;
+    }
+    .account-card h1 { font-size: 1.6rem; margin-bottom: .2rem; }
+    .account-card h1::after { display: none; }
+    .account-card h2 { font-size: 1.15rem; margin: 0 0 .25rem; }
+    .account-card h3 { font-size: 1rem; margin: 0 0 .25rem; }
+    .section-sub { color: var(--muted); font-size: .88rem; margin-bottom: 1.1rem; max-width: none; }
+    .who { color: var(--muted); font-size: .9rem; margin-bottom: 0; }
+    .card-divider { border: 0; border-top: 1px solid var(--line); margin: 1.75rem 0; }
+
+    .role-badge {
+      display: inline-block;
+      font-family: var(--display);
+      font-size: .75rem;
+      font-weight: 600;
+      padding: .15rem .55rem;
+      background: var(--tint);
+      color: var(--muted);
+      clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%);
+      margin-left: .4rem;
+      vertical-align: middle;
+    }
+    .role-badge.staff   { background: var(--navy); color: #fff; }
+    .role-badge.student { background: var(--blue); color: #fff; }
+
+    .nav-tile {
+      display: flex; align-items: center; gap: 1rem;
+      padding: 1rem 1.25rem;
+      border: 1px solid var(--line);
+      background: var(--white);
+      text-decoration: none;
+      color: var(--ink);
+      margin-bottom: .75rem;
+      transition: background .15s, border-color .15s;
+      clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+    }
+    .nav-tile:hover { background: var(--tint); border-color: var(--blue); text-decoration: none; color: var(--heading); }
+    .nav-tile .tile-icon {
+      width: 40px; height: 40px; flex-shrink: 0;
+      background: var(--tint); color: var(--blue);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem;
+    }
+    .nav-tile.staff-tile .tile-icon { background: var(--navy); color: #fff; }
+    .nav-tile .tile-text strong { display: block; font-family: var(--display); font-size: .95rem; }
+    .nav-tile .tile-text small  { color: var(--muted); font-size: .82rem; }
+    .nav-tile .fa { width: auto; height: auto; font-size: inherit; }
+    .nav-tile .tile-icon .fa { font-size: 1.1rem; }
+
+    .ghost-btn {
+      background: none; border: 1px solid var(--line);
+      color: var(--muted); font-size: .85rem; padding: .35rem .9rem;
+      cursor: pointer; font-family: var(--display); font-weight: 600;
+      clip-path: none;
+    }
+    .ghost-btn:hover { border-color: var(--heading); color: var(--heading); }
+    .ghost-btn.danger-btn { border-color: var(--red); color: var(--red); }
+    .ghost-btn.danger-btn:hover { background: #c0392b; color: #fff; }
+
+    .info-grid { display: grid; grid-template-columns: 9rem 1fr; gap: .5rem 1rem; font-size: .92rem; margin: 0; }
+    .info-grid dt { color: var(--muted); font-weight: 500; }
+    .info-grid dd { margin: 0; word-break: break-word; }
+    .ok   { color: var(--green); }
+    .warn { color: var(--amber); }
+
+    /* Bootstrap's dark-navbar rule turns .active links white, which is invisible on our white nav */
+    .navbar-dark .navbar-nav .nav-link.active { color: var(--blue); }
+    .navbar-dark .navbar-nav .nav-link.active::after { transform: scaleX(1); }
+
+    .loading { text-align: center; padding: 3rem 1rem; color: var(--muted); font-family: var(--display); }
+    .pw-meter { height: 4px; background: var(--line); margin-top: .4rem; }
+    .pw-meter span { display: block; height: 100%; width: 0; background: #c0392b; transition: width .2s, background .2s; }
+    .form-actions { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+    .danger-zone { border-top-color: #c0392b; }
+
+    /* Appearance: three-way theme switch */
+    .theme-choice { display: flex; flex-wrap: wrap; gap: .5rem; }
+    .theme-choice label { position: relative; margin: 0; cursor: pointer; }
+    .theme-choice input { position: absolute; opacity: 0; pointer-events: none; }
+    .theme-choice span {
+      display: inline-flex; align-items: center; gap: .45rem;
+      padding: .5rem 1rem; border: 1px solid var(--line); background: var(--white);
+      color: var(--ink); font-family: var(--display); font-weight: 600; font-size: .9rem;
+      transition: background .15s, border-color .15s;
+    }
+    .theme-choice span:hover { border-color: var(--blue); }
+    .theme-choice input:checked + span { background: var(--blue); border-color: var(--blue); color: #fff; }
+    .theme-choice input:focus-visible + span { outline: 3px solid var(--blue); outline-offset: 2px; }
+  </style>
+</head>
+<body>
+
+  <!-- ===== Navigation ===== -->
+  <nav class="navbar fixed-top navbar-expand-lg navbar-dark bg-dark" id="navigation">
+      <div class="container">
+        <a class="navbar-brand" href="/index.html">
+          <img src="/img/robosaintslogo.png" data-dark-src="/img/robosaintslogo-dark.png" id="navbarlogo" alt="">
+          St. Thomas Aquinas Robotics Team 1307
+        </a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarResponsive"
+                aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarResponsive">
+          <ul class="navbar-nav ml-auto">
+            <li class="nav-item">
+              <a class="nav-link" href="/index.html">Home</a>
+            </li>
+
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle" href="#" id="navSponsors" role="button"
+                data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Sponsors</a>
+              <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navSponsors">
+                <a class="dropdown-item" href="/oursponsors.html">Our Sponsors</a>
+                <a class="dropdown-item" href="/business-plan.html">Business Plan</a>
+              </div>
+            </li>
+
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle" href="#" id="navAbout" role="button"
+                data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">About Us</a>
+              <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navAbout">
+                <a class="dropdown-item" href="/about-the-students.html">The Students</a>
+                <a class="dropdown-item" href="/about-the-mentors.html">The Mentors</a>
+                <a class="dropdown-item" href="/about-the-robot.html">The Robots</a>
+                <a class="dropdown-item" href="/results.html">Season Results</a>
+              </div>
+            </li>
+
+            <li class="nav-item">
+              <a class="nav-link" href="/Gallery/gallery.html">Picture Gallery</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/contact.html">Contact Us</a>
+            </li>
+
+            <!-- 1307scout command center. Items marked data-role are shown or hidden by auth.js -->
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle" href="#" id="navScout" role="button"
+                data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">1307scout</a>
+              <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navScout">
+                <a class="dropdown-item" href="/1307scout.html">1307scout Home</a>
+                <h6 class="dropdown-header" data-role="team" hidden>Data</h6>
+                <a class="dropdown-item" href="/live.html" data-role="team" hidden>Competition Day</a>
+                <a class="dropdown-item" href="/query.html" data-role="team" hidden>Team Database</a>
+                <a class="dropdown-item" href="/alliance.html" data-role="team" hidden>Alliance View</a>
+                <a class="dropdown-item" href="/scout.html" data-role="team" hidden>Scout</a>
+                <a class="dropdown-item" href="/flags.html" data-role="team" hidden>Match Flags</a>
+                <a class="dropdown-item" href="/playoffs.html" data-role="team" hidden>Playoff Selection</a>
+                <a class="dropdown-item" href="/bracket.html" data-role="team" hidden>Playoff Bracket</a>
+                <a class="dropdown-item" href="/share.html" data-role="team" hidden>Share Data</a>
+                <h6 class="dropdown-header" data-role="team" hidden>My Team</h6>
+                <a class="dropdown-item" href="/matches.html" data-role="team" hidden>Our Matches</a>
+                <a class="dropdown-item" href="/strategy.html" data-role="team" hidden>Match Strategy</a>
+                <a class="dropdown-item" href="/pitcrew.html" data-role="team" hidden>Pit Crew</a>
+                <a class="dropdown-item" href="/picklist.html" data-role="team" hidden>Pick List</a>
+                <a class="dropdown-item" href="/shifts.html" data-role="team" hidden>Scout Shifts</a>
+                <a class="dropdown-item" href="/team.html" data-role="team" hidden>Team Management</a>
+                <div class="dropdown-divider" data-role="staff" hidden></div>
+                <a class="dropdown-item" href="/portal.html" data-role="staff" hidden>Staff Portal</a>
+              </div>
+            </li>
+
+            <li class="nav-item" id="authNavItem">
+              <a class="nav-link" href="/signin.html">Sign In</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+  <div class="account-wrap">
+    <div class="loading" id="loadingState">Loading…</div>
+
+    <div id="accountArea" style="display:none;">
+
+      <!-- Header + quick links -->
+      <div class="account-card">
+        <div class="d-flex justify-content-between align-items-start flex-wrap">
+          <div>
+            <h1>My account <span id="roleBadge" class="role-badge"></span></h1>
+            <p class="who" id="whoText"></p>
+          </div>
+          <button class="ghost-btn mt-2 mt-sm-0" id="signOutBtn" type="button">Sign out</button>
+        </div>
+      </div>
+
+      <div id="globalMsg" class="alert d-none" role="alert" aria-live="polite"></div>
+
+      <!-- Profile: details, email, and password all live here -->
+      <div class="account-card">
+        <h2>Profile</h2>
+        <p class="section-sub">How you appear to team staff, and how you sign in.</p>
+
+        <!-- Details -->
+        <form id="profileForm" novalidate>
+          <h3>Details</h3>
+          <div class="form-group">
+            <label for="pfName">Display name</label>
+            <input id="pfName" type="text" class="form-control" maxlength="60" autocomplete="name">
+          </div>
+          <div class="form-group">
+            <label for="pfPhone">Phone number <small class="text-muted">(optional)</small></label>
+            <input id="pfPhone" type="tel" class="form-control" maxlength="25" autocomplete="tel" placeholder="(603) 555-0123">
+            <small class="form-text text-muted">Used only by team staff to reach you about scouting or events.</small>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary" id="profileBtn">Save details</button>
+            <span id="profileMsg" class="small" role="status" aria-live="polite"></span>
+          </div>
+        </form>
+
+        <hr class="card-divider">
+
+        <!-- Email -->
+        <form id="emailForm" novalidate>
+          <h3>Email</h3>
+          <p class="section-sub">Current address: <strong id="curEmail"></strong>. For security, we'll send a confirmation link to both your current and new addresses. The change takes effect after you confirm from both.</p>
+          <div class="form-group">
+            <label for="emNew">New email address</label>
+            <input id="emNew" type="email" class="form-control" autocomplete="email">
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary" id="emailBtn">Send confirmation link</button>
+            <span id="emailMsg" class="small" role="status" aria-live="polite"></span>
+          </div>
+        </form>
+
+        <hr class="card-divider">
+
+        <!-- Password: step 1 sends a code, step 2 needs that code to save -->
+        <form id="pwForm" novalidate>
+          <h3 id="pwTitle">Change password</h3>
+          <p class="section-sub" id="pwSub">For your security, we'll email you a 6-digit verification code first. Enter it with your new password to finish. Passwords need at least 8 characters, including an uppercase letter, a lowercase letter, a number, and a symbol.</p>
+
+          <div id="pwStep1">
+            <button type="button" class="btn btn-outline-secondary" id="pwSendBtn">Email me a verification code</button>
+          </div>
+
+          <div id="pwStep2" class="d-none">
+            <div class="form-group">
+              <label for="pwCode">Verification code</label>
+              <input id="pwCode" type="text" class="form-control" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="\d{6}" placeholder="6-digit code">
+              <small class="form-text text-muted">Check your inbox at <span class="pwEmail"></span>. The code is 6 digits and expires after 1 hour.</small>
+            </div>
+            <div class="form-group">
+              <label for="pwNew">New password</label>
+              <input id="pwNew" type="password" class="form-control" minlength="8" autocomplete="new-password">
+              <div class="pw-meter" aria-hidden="true"><span id="pwBar"></span></div>
+            </div>
+            <div class="form-group">
+              <label for="pwNew2">Confirm new password</label>
+              <input id="pwNew2" type="password" class="form-control" autocomplete="new-password">
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary" id="pwBtn">Update password</button>
+              <button type="button" class="ghost-btn" id="pwResendBtn">Resend code</button>
+              <button type="button" class="ghost-btn" id="pwCancelBtn">Cancel</button>
+            </div>
+          </div>
+
+          <div class="mt-2"><span id="pwMsg" class="small" role="status" aria-live="polite"></span></div>
+        </form>
+      </div>
+
+      <!-- Appearance: light / dark theme, applied by /js/theme.js -->
+      <div class="account-card">
+        <h2>Appearance</h2>
+        <p class="section-sub">Choose how 1307scout and the team website look. Saved to your account, so it follows
+          you to other devices when you sign in.</p>
+        <div class="theme-choice" role="radiogroup" aria-label="Theme">
+          <label><input type="radio" name="theme" value="light"><span><i class="fa fa-sun-o" aria-hidden="true"></i> Light</span></label>
+          <label><input type="radio" name="theme" value="dark"><span><i class="fa fa-moon-o" aria-hidden="true"></i> Dark</span></label>
+          <label><input type="radio" name="theme" value="system"><span><i class="fa fa-desktop" aria-hidden="true"></i> Match device</span></label>
+        </div>
+        <div class="mt-2"><span id="themeMsg" class="small" role="status" aria-live="polite"></span></div>
+      </div>
+
+      <!-- Account details -->
+      <div class="account-card">
+        <h2>Account details</h2>
+        <p class="section-sub">Read-only information about your account.</p>
+        <dl class="info-grid">
+          <dt>Access level</dt><dd id="dtLevel"></dd>
+          <dt>Email status</dt><dd id="dtVerified"></dd>
+          <dt>Sign-in method</dt><dd id="dtProvider"></dd>
+          <dt>Member since</dt><dd id="dtCreated"></dd>
+          <dt>Last sign-in</dt><dd id="dtLast"></dd>
+        </dl>
+        <p class="section-sub mt-3 mb-0" id="levelHelp"></p>
+      </div>
+
+      <!-- The 1307scout app (PWA). Buttons and data-app-* attributes are run by /js/pwa.js -->
+      <div class="account-card" id="appCard">
+        <h2>1307scout app</h2>
+        <p class="section-sub" data-app-when="browser" hidden>Install 1307scout on this device to open it from your
+          home screen or Start menu, even with no connection. Same account, same features as the website.</p>
+        <p class="section-sub" data-app-when="installed" hidden>You're using the installed app on this device.</p>
+        <p class="section-sub" id="draftCount" hidden></p>
+        <button class="btn btn-primary mr-2" type="button" data-app-install hidden>Install the app</button>
+        <a class="ghost-btn" href="/app.html" style="display:inline-block;text-decoration:none;">Install steps and offline help</a>
+      </div>
+
+      <!-- Match alerts: push notifications, run by /js/alerts.js. Team members only. -->
+      <div class="account-card" id="alertsCard" hidden>
+        <h2>Match alerts</h2>
+        <p class="section-sub">Get a notification on this device before a team needs to queue, on competition days while
+          auto-sync is on. At events that run queuing on <a href="https://frc.nexus" target="_blank" rel="noopener">FRC Nexus</a>, it comes
+          when the match is queuing or about 10 minutes before its estimated queue time; elsewhere, when the team's next match
+          is 3 or fewer matches away. Tapping it opens that match's strategy plan. Each device is turned on separately.
+          On iPhone and iPad this works only in the installed app.</p>
+        <div class="d-flex flex-wrap align-items-end" style="gap:.5rem;">
+          <div><label for="alertTeam" class="small mb-0">Team</label>
+            <input type="number" id="alertTeam" class="form-control form-control-sm" min="1" max="99999" placeholder="Team #" style="width:6.5rem;"></div>
+          <button class="btn btn-primary btn-sm" type="button" id="alertsOn">Turn on</button>
+          <button class="ghost-btn" type="button" id="alertsOff" hidden>Turn off</button>
+        </div>
+        <div class="mt-2"><span id="alertsMsg" class="small" role="status" aria-live="polite"></span></div>
+      </div>
+
+      <!-- Sessions -->
+      <div class="account-card danger-zone">
+        <h2>Sessions</h2>
+        <p class="section-sub">Signed in on a shared or lost device? Sign out everywhere, then sign back in here.</p>
+        <button class="ghost-btn" id="signOutAllBtn" type="button">Sign out of all devices</button>
+      </div>
+
+      <!-- Delete account -->
+      <div class="account-card danger-zone">
+        <h2>Delete account</h2>
+        <p class="section-sub">Permanently deletes your account and sign-in, along with the scouting entries, pit
+          entries and photos you entered. This can't be undone.</p>
+        <button class="ghost-btn danger-btn" id="deleteAccountBtn" type="button">Delete my account</button>
+        <div class="mt-2"><span id="deleteMsg" class="small" role="status" aria-live="polite"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="py-5" id="bottomrow">
+    <a href="https://instagram.com/1307robosaints" class="fa fa-instagram" target="_blank" rel="noopener" aria-label="Instagram"></a>
+    <a href="https://www.youtube.com/@1307Robosaints" class="fa fa-youtube" target="_blank" rel="noopener" aria-label="YouTube"></a>
+    <a href="https://www.facebook.com/1307robosaints" class="fa fa-facebook" target="_blank" rel="noopener" aria-label="Facebook"></a>
+    <a href="https://www.tiktok.com/@1307.robotics" class="fa social-tt" target="_blank" rel="noopener" aria-label="TikTok">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path fill="currentColor" d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
+      </svg>
+    </a>
+    <div class="container">
+      <p class="m-0 text-center text-white">Copyright &copy; STA Robotics Team 2026</p>
+      <p class="m-0 mt-2 text-center" style="font-size:.78rem;">
+        Website and 1307scout service created and maintained by Daniel Lowry —
+        <a href="/contact.html" style="color:#fff;text-decoration:underline;">website support</a>
+      </p>
+      <p class="m-0 mt-2 text-center" style="font-size:.78rem;">
+        <a href="/privacy-policy.html" style="color:#fff;text-decoration:underline;">Privacy Policy</a>
+        &nbsp;&middot;&nbsp;
+        <a href="/terms-of-service.html" style="color:#fff;text-decoration:underline;">Terms of Service</a>
+      </p>
+    </div>
+  </footer>
+
+  <script src="/vendor/jquery/jquery.min.js"></script>
+  <script src="/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" integrity="sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o" crossorigin="anonymous"></script>
+  <script src="/js/auth-config.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/dialog.js"></script>
+  <script src="/js/pwa.js"></script>
+  <script src="/js/alerts.js"></script>
+  <script>
+  (async function () {
+    var sb = RS.sb;
+    var $ = function (id) { return document.getElementById(id); };
+    var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+    var DISPOSABLE = /@(mailinator|guerrillamail|10minutemail|tempmail|yopmail|trashmail|sharklasers|getnada|throwawaymail|dispostable|maildrop)\./i;
+    var PW_MIN = 8;
+    var PW_RULES = "Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a symbol.";
+    function pwOk(p) {
+      return p.length >= PW_MIN && /[a-z]/.test(p) && /[A-Z]/.test(p) && /\d/.test(p) && /[^A-Za-z0-9]/.test(p);
+    }
+    var PW_DEFAULT_SUB = "For your security, we'll email you a 6-digit verification code first. Enter it with your new password to finish. Passwords need at least 8 characters, including an uppercase letter, a lowercase letter, a number, and a symbol.";
+
+    var s = await RS.session();   // the saved login when offline, so this doesn't bounce to Sign in
+    if (!s) { location.replace("signin.html"); return; }
+    // Came through sign-in from a share link: finish the trip (scout.html clears the saved code)
+    if (sessionStorage.getItem("rs_code")) { location.replace("scout.html"); return; }
+    // Came through sign-in from a team invite link: back to Team Management (team.html fills in the code)
+    if (sessionStorage.getItem("rs_join")) { location.replace("team.html"); return; }
+
+    var user = s.user;
+    // null = the server couldn't be reached (auth.js shows a banner). Keep going so Sign out still
+    // works, but don't call a team member a guest.
+    var lvl  = await RS.accessLevel();
+    var isStaff = lvl === "staff", isStudent = lvl === "student";
+    var myTeam = lvl === null ? null : await RS.team();   // { team_number, role, name, ... } (js/auth.js)
+    var MY_TEAM = myTeam && myTeam.team_number, isManager = !!myTeam && myTeam.role === "manager";
+
+    // Where an account with no team stands: waiting to be verified, turned down, or not said (team.html)
+    function claimLine(t) {
+      var c = t && t.claim;
+      if (!t || t.team_number) return "";
+      if (!c) return "You haven't said which FRC team you're on. Tell us on Team Management to join your team.";
+      if (c.status === "pending") return "Waiting to be verified on team " + c.team_number + ". Until one of its managers or site staff verifies you, you use 1307scout as a guest.";
+      if (c.status === "denied") return "Team " + c.team_number + " didn't verify you" + (c.note ? ': "' + c.note + '"' : "") + ". See Team Management.";
+      return "";
+    }
+
+    function flash(el, ok, text) {
+      el.className = "small " + (ok ? "ok" : "text-danger");
+      el.textContent = text;
+    }
+    function fmtDate(d, withTime) {
+      if (!d) return "—";
+      var dt = new Date(d);
+      return withTime ? dt.toLocaleString() : dt.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+    }
+    function cooldown(btn, secs) {
+      btn.disabled = true;
+      var label = btn.dataset.label || btn.textContent;
+      btn.dataset.label = label;
+      var left = secs;
+      btn.textContent = label + " (" + left + "s)";
+      var t = setInterval(function () {
+        left--;
+        if (left <= 0) { clearInterval(t); btn.disabled = false; btn.textContent = label; return; }
+        btn.textContent = label + " (" + left + "s)";
+      }, 1000);
+    }
+
+    // ── Header ───────────────────────────────────────────────────────
+    var levelLabel = lvl === null ? "Unknown" : (isStaff ? "Staff" : isManager ? "Team manager" : isStudent ? "Team member" : "Guest") +
+      (MY_TEAM ? " · Team " + MY_TEAM : "");
+    var badge = $("roleBadge");
+    badge.textContent = levelLabel;
+    if (isStaff) badge.classList.add("staff"); else if (isStudent) badge.classList.add("student");
+
+    var meta = user.user_metadata || {};
+    var name = meta.display_name || meta.full_name || meta.name || "";
+    $("whoText").textContent = name ? "Welcome back, " + name + "." : "Welcome back.";
+
+    // ── Tiles ────────────────────────────────────────────────────────
+    var tiles = [{
+      href: "/1307scout.html", icon: "fa-home", cls: "",
+      title: "1307scout Home", desc: "Overview of the scouting tool"
+    }];
+    if (isStaff) tiles.push({
+      href: "/portal.html", icon: "fa-cog", cls: "staff-tile",
+      title: "Staff Portal", desc: "Configure events, form fields, teams and members"
+    });
+    if (lvl !== null) tiles.push({
+      href: "/team.html", icon: "fa-id-badge", cls: "",
+      title: MY_TEAM ? "Team Management" : "Join or manage a team",
+      desc: MY_TEAM ? (isManager ? "Members, join codes, permissions and pit crew setup" : "Your team and its managers")
+                    : "Join with a code from your team's managers, or ask to manage your team"
+    });
+    if (isStaff || isStudent) tiles.push({
+      href: "/scout.html", icon: "fa-clipboard", cls: "",
+      title: "Scout", desc: "Record match data at a competition"
+    });
+    if (isStaff || isStudent) tiles.push({
+      href: "/share.html", icon: "fa-share-alt", cls: "",
+      title: "Share Data", desc: "Make a share code for someone who isn't on a team here"
+    }); else if (lvl !== null) tiles.push({
+      href: "/scout.html", icon: "fa-search", cls: "",
+      title: "View Shared Data", desc: "Enter a share code to view team scouting data"
+    });
+    var tileEl = $("tileArea");
+    if (tileEl) tileEl.innerHTML = tiles.map(function (t) {
+      return '<a href="' + t.href + '" class="nav-tile ' + t.cls + '">' +
+        '<div class="tile-icon"><i class="fa ' + t.icon + '"></i></div>' +
+        '<div class="tile-text"><strong>' + t.title + '</strong><small>' + t.desc + '</small></div>' +
+        '<i class="fa fa-chevron-right ml-auto text-muted" style="font-size:.75rem;"></i></a>';
+    }).join("");
+
+    // ── Appearance ───────────────────────────────────────────────────
+    // Applies right away on this device (theme.js), then saves to the account's metadata so auth.js
+    // can apply it on the person's other devices. If that save fails, the device setting still stands.
+    var themeInputs = document.querySelectorAll('input[name="theme"]');
+    function showTheme(c) { themeInputs.forEach(function (i) { i.checked = i.value === c; }); }
+    showTheme(RSTheme.choice());
+    document.addEventListener("rs-theme", function (e) { showTheme(e.detail); });
+    themeInputs.forEach(function (i) {
+      i.addEventListener("change", async function () {
+        var c = RSTheme.set(i.value), msg = $("themeMsg");
+        msg.textContent = "";
+        var r;
+        try { r = await sb.auth.updateUser({ data: { theme: c } }); } catch (e) { r = { error: e }; }
+        if (r.error) flash(msg, false, "Saved on this device. Couldn't save it to your account; try again when you're online.");
+        else RSTheme.savedToAccount(c);
+      });
+    });
+
+    // ── Match alerts (js/alerts.js) ──────────────────────────────────
+    async function showAlerts() {
+      var msg = $("alertsMsg");
+      if (!RSAlerts.supported()) { msg.textContent = "This browser can't show notifications from a website."; $("alertsOn").disabled = true; return; }
+      if (!RSAlerts.configured()) { msg.textContent = "Match alerts aren't set up on the server yet."; $("alertsOn").disabled = true; return; }
+      var st = await RSAlerts.status(sb).catch(function () { return { on: false }; });
+      $("alertsOff").hidden = !st.on;
+      $("alertsOn").textContent = st.on ? "Change team" : "Turn on";
+      if (st.on) $("alertTeam").value = st.team;
+      msg.textContent = st.on ? "On for team " + st.team + " on this device." : "Off on this device.";
+    }
+    if (isStaff || isStudent) {
+      $("alertsCard").hidden = false;
+      if (MY_TEAM) $("alertTeam").value = MY_TEAM;   // showAlerts() puts in the saved team, if alerts are on
+      showAlerts();
+      $("alertsOn").addEventListener("click", async function () {
+        var team = Number($("alertTeam").value);
+        if (!(Number.isInteger(team) && team >= 1 && team <= 99999)) { flash($("alertsMsg"), false, "Enter a team number."); return; }
+        try { await RSAlerts.enable(sb, team); showAlerts(); }
+        catch (e) { flash($("alertsMsg"), false, e.message); }
+      });
+      $("alertsOff").addEventListener("click", async function () {
+        try { await RSAlerts.disable(sb); showAlerts(); }
+        catch (e) { flash($("alertsMsg"), false, e.message); }
+      });
+    }
+
+    // ── Profile: details ─────────────────────────────────────────────
+    $("pfName").value  = name;
+    $("pfPhone").value = meta.phone || "";
+    $("curEmail").textContent = user.email || "";
+    document.querySelectorAll(".pwEmail").forEach(function (el) { el.textContent = user.email || "your email"; });
+
+    $("profileForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      var msg = $("profileMsg"), btn = $("profileBtn");
+      var n = $("pfName").value.trim(), p = $("pfPhone").value.trim();
+      if (!n) return flash(msg, false, "Please enter a display name.");
+      if (p) {
+        var digits = p.replace(/\D/g, "");
+        if (!/^[\d\s().+\-]+$/.test(p) || digits.length < 7 || digits.length > 15)
+          return flash(msg, false, "Enter a valid phone number, or leave it blank.");
+      }
+      btn.disabled = true; msg.textContent = "";
+      var r = await sb.auth.updateUser({ data: { display_name: n, phone: p } });
+      btn.disabled = false;
+      if (r.error) return flash(msg, false, "Couldn't save your details. Please try again.");
+      $("whoText").textContent = "Welcome back, " + n + ".";
+      flash(msg, true, "Details saved.");
+    });
+
+    // ── Profile: email ───────────────────────────────────────────────
+    $("emailForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      var msg = $("emailMsg"), btn = $("emailBtn");
+      var newEmail = $("emNew").value.trim().toLowerCase();
+
+      if (!EMAIL_RE.test(newEmail)) return flash(msg, false, "Enter a valid email address.");
+      if (newEmail === (user.email || "").toLowerCase()) return flash(msg, false, "That's already your email address.");
+      if (DISPOSABLE.test(newEmail)) return flash(msg, false, "Please use a permanent email address, not a temporary one.");
+
+      btn.disabled = true; msg.textContent = "";
+      var r = await sb.auth.updateUser({ email: newEmail });
+      btn.disabled = false;
+
+      if (r.error) {
+        if (/already|registered|exists/i.test(r.error.message)) return flash(msg, false, "That email is already in use.");
+        if (/rate limit/i.test(r.error.message)) return flash(msg, false, "Too many attempts. Wait a few minutes and try again.");
+        return flash(msg, false, "Couldn't send the confirmation link. Please try again.");
+      }
+      $("emNew").value = "";
+      flash(msg, true, "Confirmation links were sent to your current and new addresses. Click both to finish the change.");
+    });
+
+    // ── Profile: password (code required) ────────────────────────────
+    var providers = (user.app_metadata && user.app_metadata.providers) || [];
+    var hasPassword = providers.indexOf("email") !== -1;
+    if (!hasPassword) {
+      $("pwTitle").textContent = "Set a password";
+      $("pwSub").textContent = "You signed in with Google. Optionally add a password so you can also sign in with your email. We'll send a 6-digit verification code first. Passwords need at least 8 characters, including an uppercase letter, a lowercase letter, a number, and a symbol.";
+    }
+
+    $("pwNew").addEventListener("input", function () {
+      var v = this.value, score = 0;
+      if (v.length >= 8) score++;
+      if (v.length >= 14) score++;
+      if (/[a-z]/.test(v) && /[A-Z]/.test(v)) score++;
+      if (/\d/.test(v) && /[^A-Za-z0-9]/.test(v)) score++;
+      var bar = $("pwBar");
+      bar.style.width = (v ? Math.max(score, 1) * 25 : 0) + "%";
+      bar.style.background = score <= 1 ? "#c0392b" : score === 2 ? "#d68910" : "#1a7f4b";
+    });
+
+    function showStep(step) {
+      $("pwStep1").classList.toggle("d-none", step !== 1);
+      $("pwStep2").classList.toggle("d-none", step !== 2);
+    }
+    function resetPwForm() {
+      $("pwCode").value = ""; $("pwNew").value = ""; $("pwNew2").value = "";
+      $("pwBar").style.width = "0";
+      $("pwMsg").textContent = "";
+      showStep(1);
+    }
+
+    async function sendCode(btn) {
+      var msg = $("pwMsg");
+      btn.disabled = true; msg.textContent = "";
+      var r = await sb.auth.reauthenticate();
+      if (r.error) {
+        btn.disabled = false;
+        if (/rate limit|seconds|too many/i.test(r.error.message)) return flash(msg, false, "Please wait a minute before requesting another code.");
+        return flash(msg, false, "Couldn't send a code. Please try again.");
+      }
+      showStep(2);
+      flash(msg, true, "We emailed a 6-digit verification code to " + user.email + ".");
+      cooldown(btn, 60);
+      $("pwCode").focus();
+    }
+
+    $("pwSendBtn").addEventListener("click", function () { sendCode(this); });
+    $("pwResendBtn").addEventListener("click", function () { sendCode(this); });
+    $("pwCancelBtn").addEventListener("click", resetPwForm);
+
+    $("pwForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      var msg = $("pwMsg"), btn = $("pwBtn");
+      if ($("pwStep2").classList.contains("d-none")) return; // a code must be requested first
+
+      var code = $("pwCode").value.trim();
+      var p = $("pwNew").value;
+      if (!/^\d{6}$/.test(code)) return flash(msg, false, "Enter the 6-digit code from your email.");
+      if (!pwOk(p)) return flash(msg, false, PW_RULES);
+      if (p !== $("pwNew2").value) return flash(msg, false, "Passwords don't match.");
+
+      btn.disabled = true; msg.textContent = "";
+      var r = await sb.auth.updateUser({ password: p, nonce: code });
+      btn.disabled = false;
+
+      if (r.error) {
+        if (/nonce|reauthenticat|expired|invalid.*(code|token)|otp/i.test(r.error.message))
+          return flash(msg, false, "That code is wrong or has expired. Check it, or resend a new one.");
+        if (/same|different/i.test(r.error.message)) return flash(msg, false, "Choose a password you haven't used before.");
+        if (/weak|pwned|breach/i.test(r.error.message)) return flash(msg, false, "That password is too easy to guess. Try a longer one.");
+        return flash(msg, false, "Couldn't update your password. Please try again.");
+      }
+
+      hasPassword = true;
+      $("pwTitle").textContent = "Change password";
+      $("pwSub").textContent = PW_DEFAULT_SUB;
+      resetPwForm();
+      flash(msg, true, "Password updated.");
+    });
+
+    // ── Account details ──────────────────────────────────────────────
+    $("dtLevel").textContent = levelLabel;
+    if (user.email_confirmed_at) {
+      $("dtVerified").innerHTML = '<span class="ok"><i class="fa fa-check" style="font-size:inherit;width:auto;height:auto"></i> Verified</span>';
+    } else {
+      $("dtVerified").innerHTML = '<span class="warn">Not verified. Check your inbox for our link.</span>';
+    }
+    var labels = { email: "Email & password", google: "Google" };
+    $("dtProvider").textContent = (providers.length ? providers : ["email"])
+      .map(function (p) { return labels[p] || p; }).join(", ");
+    $("dtCreated").textContent = fmtDate(user.created_at, false);
+    $("dtLast").textContent    = fmtDate(user.last_sign_in_at, true);
+    $("levelHelp").textContent = claimLine(myTeam) || ((isStaff || isStudent || lvl === null) ? "" :
+      "Team members get full access once verified on their team: say which team you're on, on Team Management.");
+
+    // ── Sign out ─────────────────────────────────────────────────────
+    // RS.signOut clears this device even if the server can't be reached or the session
+    // was already removed by a staff member (staff_kick).
+    $("signOutBtn").addEventListener("click", async function () {
+      await RS.signOut();
+      location.href = "/index.html";
+    });
+    $("signOutAllBtn").addEventListener("click", async function () {
+      if (!(await RSDialog.confirm("You'll be signed out of 1307scout on every device, including this one.",
+          { title: "Sign out everywhere", ok: "Sign out" }))) return;
+      await RS.signOut({ scope: "global" });
+      location.href = "/signin.html";
+    });
+
+    // ── Delete account ──────────────────────────────────────────────
+    $("deleteAccountBtn").addEventListener("click", async function () {
+      var typed = await RSDialog.prompt("This permanently deletes your account and everything tied to it. It can't be undone.\n\nType DELETE to confirm.",
+        { title: "Delete your account", ok: "Delete account", danger: true, placeholder: "DELETE", match: "DELETE" });
+      if (typed !== "DELETE") return;
+      var msg = $("deleteMsg"), btn = this;
+      btn.disabled = true;
+      flash(msg, true, "Deleting…");
+      var r = await sb.functions.invoke("delete-account", {});
+      btn.disabled = false;
+      if (r.error) { flash(msg, false, await (async function () {
+        try { return (await r.error.context.json()).error || "Couldn't delete your account."; }
+        catch (e) { return "Couldn't delete your account."; }
+      })()); return; }
+      await RS.signOut();
+      location.href = "/index.html";
+    });
+
+    // Match entries saved offline on this device and not yet sent (see scout.html's draft queue)
+    var drafts = [];
+    try { drafts = JSON.parse(localStorage.getItem("rs_drafts_" + user.id) || "[]"); } catch (e) {}
+    if (drafts.length) {
+      $("draftCount").textContent = drafts.length + " match entr" + (drafts.length > 1 ? "ies are" : "y is") +
+        " waiting on this device to be sent. Open the Scout page with a connection to send " +
+        (drafts.length > 1 ? "them" : "it") + ".";
+      $("draftCount").hidden = false;
+    }
+
+    // ── Show page ────────────────────────────────────────────────────
+    $("loadingState").style.display = "none";
+    $("accountArea").style.display  = "";
+  })();
+  </script>
+</body>
+</html>

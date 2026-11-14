@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<!-- =========================================================================================================
+     1307scout.html  –  landing page for the scouting tool.
+     Shows one of two views, chosen by the script at the bottom:
+       #loggedOutView  marketing page (hero, features, access tiers, call to action)
+       #loggedInView   greeting bar plus tiles linking to the tools the person's access level allows
+     Both start hidden (see "Shared" in the CSS); the script reveals the right one once it knows who's signed in.
+     ========================================================================================================= -->
+<html lang="en">
+<head>
+<script>window.RS_BUILD = {"version":"0.0.5+7eca554","channel":"experimental","commit":"7eca554","site":"beta"};</script>
+  <link rel="icon" href="/img/robosaintslogo.png">
+  <!-- 1307scout app (PWA): see /js/pwa.js and /sw.js -->
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#0A2352">
+  <link rel="apple-touch-icon" href="/img/app/apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="1307scout β">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <title>1307scout</title>
+
+  <!-- Styles: Bootstrap, Font Awesome icons, site fonts, then the site theme (modern.css loads last so it wins) -->
+  <!-- Open connections early to the hosts this page needs before it can draw or load data -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="preconnect" href="https://nyanwljgsazwuzmnlrcz.supabase.co" crossorigin>
+  <!-- Light/dark theme, before the stylesheets so a dark page never flashes white -->
+  <script src="/js/theme.js"></script>
+  <link href="/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="/css/modern.css" rel="stylesheet">
+  <style>
+    /* ── Page-level overrides ─────────────────────────────────── */
+    body { background: var(--paper); }
+    /* Suppress the global body::before grid on this page —
+       we replicate it inside the hero only */
+    body::before { display: none; }
+
+    /* ══════════════════════════════════════════════════════════
+       LOGGED-OUT VIEW
+    ══════════════════════════════════════════════════════════ */
+
+    /* Hero: navy banner with a clipped bottom-right corner */
+    .scout-hero {
+      position: relative;
+      background: var(--navy);
+      overflow: hidden;
+      padding: 7rem 0 5rem;
+      clip-path: polygon(0 0, 100% 0, 100% calc(100% - 56px), calc(100% - 56px) 100%, 0 100%);
+    }
+    /* Engineering grid inside the hero */
+    .scout-hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.06) 1px, transparent 1px);
+      background-size: 32px 32px;
+      -webkit-mask-image: linear-gradient(#000 30%, transparent);
+              mask-image: linear-gradient(#000 30%, transparent);
+      pointer-events: none;
+    }
+    /* Accent stripe on the left edge */
+    .scout-hero::after {
+      content: "";
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 4px;
+      background: var(--blue);
+    }
+
+    .hero-inner { position: relative; z-index: 1; }   /* sits above the grid and stripe */
+
+    .hero-wordmark {
+      font-family: var(--display);
+      font-size: clamp(3rem, 8vw, 5.5rem);
+      font-weight: 700;
+      color: #fff;
+      line-height: 1;
+      letter-spacing: -.02em;
+      margin-bottom: .6rem;
+    }
+    /* The "1307" is slightly dimmed so "scout" reads as the product name */
+    .hero-wordmark .team-num {
+      color: rgba(255,255,255,.55);
+      font-size: .72em;
+    }
+    .hero-tagline {
+      color: rgba(255,255,255,.78);
+      font-size: clamp(1rem, 2.5vw, 1.2rem);
+      font-family: var(--body);
+      max-width: 46ch;
+      margin-bottom: 2.25rem;
+      line-height: 1.55;
+    }
+    /* Call-to-action button (used in the hero and at the bottom of the page) */
+    .hero-cta {
+      display: inline-block;
+      background: var(--blue);
+      color: #fff;
+      font-family: var(--display);
+      font-weight: 600;
+      font-size: 1rem;
+      padding: .75rem 2rem;
+      border: 0;
+      clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+      text-decoration: none;
+      transition: background .15s;
+    }
+    .hero-cta:hover { background: #2560d4; color: #fff; text-decoration: none; }
+
+    /* Features: three cards under the hero */
+    .features-section { padding: 4rem 0 3rem; }
+    .features-section h2 {
+      font-size: 1.55rem;
+      margin-bottom: .35rem;
+    }
+    .features-section h2::after { display: none; }
+    .features-lead {
+      color: var(--muted);
+      max-width: 55ch;
+      margin-bottom: 2.5rem;
+      font-size: .97rem;
+    }
+
+    .feature-card {
+      background: var(--white);
+      border: 1px solid var(--line);
+      padding: 1.5rem;
+      height: 100%;
+      position: relative;
+    }
+    /* Clipped corner signature */
+    .feature-card::after {
+      content: "";
+      position: absolute;
+      top: -1px; right: -1px;
+      width: 18px; height: 18px;
+      background: linear-gradient(to bottom left,
+        var(--paper) 0 calc(50% - .5px),
+        var(--line) calc(50% - .5px) calc(50% + .5px),
+        transparent calc(50% + .5px));
+    }
+    .feature-icon {
+      width: 40px; height: 40px;
+      background: var(--tint);
+      color: var(--blue);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem;
+      margin-bottom: 1rem;
+    }
+    .feature-card h3 {
+      font-size: 1rem;
+      margin-bottom: .4rem;
+    }
+    .feature-card h3::after { display: none; }
+    .feature-card p {
+      color: var(--muted);
+      font-size: .9rem;
+      max-width: none;
+      margin: 0;
+      line-height: 1.55;
+    }
+
+    /* Who it's for: navy band describing the three access levels */
+    .tiers-section {
+      background: var(--navy);
+      padding: 3.5rem 0;
+      margin-bottom: 0;
+      clip-path: polygon(0 40px, 40px 0, 100% 0, 100% 100%, 0 100%);
+    }
+    .tiers-section h2 { color: #fff; }
+    .tiers-section h2::after { background: rgba(255,255,255,.3); }
+    .tier-item {
+      border-left: 3px solid var(--blue);
+      padding: .75rem 1rem;
+      margin-bottom: 1rem;
+      background: rgba(255,255,255,.05);
+    }
+    .tier-item:last-child { margin-bottom: 0; }
+    .tier-item strong {
+      font-family: var(--display);
+      color: #fff;
+      font-size: .95rem;
+      display: block;
+      margin-bottom: .2rem;
+    }
+    .tier-item p {
+      color: rgba(255,255,255,.68);
+      font-size: .88rem;
+      margin: 0;
+      max-width: none;
+    }
+
+    /* Bottom CTA */
+    .bottom-cta {
+      padding: 4rem 0;
+      text-align: center;
+    }
+    .bottom-cta h2 { font-size: 1.6rem; margin-bottom: .5rem; }
+    .bottom-cta h2::after { margin: .5rem auto .9rem; }
+    .bottom-cta p { color: var(--muted); max-width: 44ch; margin: 0 auto 1.75rem; }
+
+    /* ══════════════════════════════════════════════════════════
+       LOGGED-IN HOME VIEW
+    ══════════════════════════════════════════════════════════ */
+    .home-wrap { max-width: 640px; margin: 0 auto; padding: 2.5rem 1rem 4rem; }
+
+    /* Greeting bar: "Welcome back, Name" plus a role badge */
+    .greeting-bar {
+      background: var(--navy);
+      padding: 1.5rem 1.75rem;
+      margin-bottom: 2rem;
+      position: relative;
+      overflow: hidden;
+      clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 0 100%);
+    }
+    .greeting-bar::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px);
+      background-size: 24px 24px;
+      pointer-events: none;
+    }
+    .greeting-bar h2 {
+      color: #fff;
+      font-size: 1.4rem;
+      margin: 0 0 .15rem;
+      position: relative;
+    }
+    .greeting-bar h2::after { display: none; }
+    .greeting-bar p {
+      color: rgba(255,255,255,.65);
+      margin: 0;
+      font-size: .88rem;
+      position: relative;
+      max-width: none;
+    }
+    /* Role badge: the script adds one of .staff / .student / .guest */
+    .greeting-badge {
+      display: inline-block;
+      font-family: var(--display);
+      font-size: .7rem;
+      font-weight: 700;
+      padding: .1rem .5rem;
+      margin-left: .5rem;
+      vertical-align: middle;
+      clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 0 100%);
+    }
+    .greeting-badge.staff   { background: var(--blue); color: #fff; }
+    .claim-status { font-size: .88rem; margin: .4rem 0 0; padding: .35rem .6rem; border-left: 4px solid var(--amber); background: var(--amber-bg); color: var(--ink); max-width: 60ch; }
+    .greeting-badge.student { background: rgba(255,255,255,.2); color: #fff; }
+    .greeting-badge.guest   { background: rgba(255,255,255,.1); color: rgba(255,255,255,.7); }
+
+    /* Small uppercase label above a group of tiles */
+    .home-section-label {
+      font-family: var(--display);
+      font-size: .78rem;
+      font-weight: 700;
+      color: var(--muted);
+      letter-spacing: .07em;
+      text-transform: uppercase;
+      margin-bottom: .75rem;
+      padding-bottom: .3rem;
+      border-bottom: 1px solid var(--line);
+    }
+
+    /* Link tile: [icon] Title / description  > */
+    .nav-tile {
+      display: flex; align-items: center; gap: 1rem;
+      padding: 1.1rem 1.25rem;
+      border: 1px solid var(--line);
+      background: var(--white);
+      text-decoration: none;
+      color: var(--ink);
+      margin-bottom: .6rem;
+      transition: background .15s, border-color .15s;
+      position: relative;
+    }
+    .nav-tile::after {
+      content: "";
+      position: absolute;
+      top: -1px; right: -1px;
+      width: 14px; height: 14px;
+      background: linear-gradient(to bottom left,
+        var(--paper) 0 calc(50% - .5px),
+        var(--line) calc(50% - .5px) calc(50% + .5px),
+        transparent calc(50% + .5px));
+    }
+    .nav-tile:hover { background: var(--tint); border-color: var(--blue); text-decoration: none; color: var(--heading); }
+    .tile-icon {
+      width: 44px; height: 44px; flex-shrink: 0;
+      background: var(--tint); color: var(--blue);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.15rem;
+    }
+    .nav-tile.staff-tile .tile-icon { background: var(--navy); color: #fff; }   /* Staff Portal tile stands out */
+    .tile-text strong { display: block; font-family: var(--display); font-size: 1rem; }
+    .tile-text small  { color: var(--muted); font-size: .83rem; }
+    .tile-chevron { margin-left: auto; color: var(--line); font-size: .75rem; flex-shrink: 0; }
+
+    .quick-signout {
+      background: none; border: 0; padding: 0;
+      color: var(--muted); font-size: .82rem; cursor: pointer;
+      font-family: var(--body); text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    .quick-signout:hover { color: var(--heading); }
+
+    /* Get the app: install section (logged-out view) */
+    .app-section { padding: 4rem 0 3.5rem; scroll-margin-top: 40px; }   /* #get-the-app clears the fixed nav */
+    .hero-cta[hidden] + .app-ghost { margin-left: 0; }   /* no gap when there's no Install button */
+    .app-section h2 { font-size: 1.55rem; margin-bottom: .35rem; }
+    .app-section .features-lead { margin-bottom: 1.75rem; }
+    .app-points { list-style: none; padding: 0; margin: 0 0 1.5rem; }
+    .app-points li { display: flex; gap: .75rem; margin-bottom: .8rem; font-size: .93rem; color: var(--ink); }
+    .app-points .fa { color: var(--blue); width: 1.2rem; text-align: center; margin-top: .2rem; flex-shrink: 0; }
+    .app-steps { background: var(--white); border: 1px solid var(--line); padding: 1.25rem 1.4rem; }
+    .app-steps h3 { font-size: 1rem; margin-bottom: .75rem; }
+    .app-steps h3::after { display: none; }
+    .app-step { padding: .55rem .7rem; margin-bottom: .4rem; font-size: .88rem; }
+    .app-step strong { font-family: var(--display); display: block; font-size: .9rem; }
+    .app-step span { color: var(--muted); }
+    .app-ghost {
+      display: inline-block; margin-left: .75rem; font-family: var(--display); font-weight: 600;
+      font-size: .95rem; color: var(--blue); text-decoration: underline; text-underline-offset: 3px;
+    }
+
+    /* ── Shared ───────────────────────────────────────────────── */
+    /* Both views start hidden so the wrong one never flashes; the script reveals one */
+    #loggedOutView, #loggedInView { display: none; }
+  </style>
+</head>
+<body>
+
+  <!-- ===== Navigation ===== -->
+  <nav class="navbar fixed-top navbar-expand-lg navbar-dark bg-dark" id="navigation">
+      <div class="container">
+        <a class="navbar-brand" href="/index.html">
+          <img src="/img/robosaintslogo.png" data-dark-src="/img/robosaintslogo-dark.png" id="navbarlogo" alt="">
+          St. Thomas Aquinas Robotics Team 1307
+        </a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarResponsive"
+                aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarResponsive">
+          <ul class="navbar-nav ml-auto">
+            <li class="nav-item">
+              <a class="nav-link" href="/index.html">Home</a>
+            </li>
+
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle" href="#" id="navSponsors" role="button"
+                data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Sponsors</a>
+              <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navSponsors">
+                <a class="dropdown-item" href="/oursponsors.html">Our Sponsors</a>
+                <a class="dropdown-item" href="/business-plan.html">Business Plan</a>
+              </div>
+            </li>
+
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle" href="#" id="navAbout" role="button"
+                data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">About Us</a>
+              <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navAbout">
+                <a class="dropdown-item" href="/about-the-students.html">The Students</a>
+                <a class="dropdown-item" href="/about-the-mentors.html">The Mentors</a>
+                <a class="dropdown-item" href="/about-the-robot.html">The Robots</a>
+                <a class="dropdown-item" href="/results.html">Season Results</a>
+              </div>
+            </li>
+
+            <li class="nav-item">
+              <a class="nav-link" href="/Gallery/gallery.html">Picture Gallery</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/contact.html">Contact Us</a>
+            </li>
+
+            <!-- 1307scout command center. Items marked data-role are shown or hidden by auth.js -->
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle" href="#" id="navScout" role="button"
+                data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">1307scout</a>
+              <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navScout">
+                <a class="dropdown-item" href="/1307scout.html">1307scout Home</a>
+                <h6 class="dropdown-header" data-role="team" hidden>Data</h6>
+                <a class="dropdown-item" href="/live.html" data-role="team" hidden>Competition Day</a>
+                <a class="dropdown-item" href="/query.html" data-role="team" hidden>Team Database</a>
+                <a class="dropdown-item" href="/alliance.html" data-role="team" hidden>Alliance View</a>
+                <a class="dropdown-item" href="/scout.html" data-role="team" hidden>Scout</a>
+                <a class="dropdown-item" href="/flags.html" data-role="team" hidden>Match Flags</a>
+                <a class="dropdown-item" href="/playoffs.html" data-role="team" hidden>Playoff Selection</a>
+                <a class="dropdown-item" href="/bracket.html" data-role="team" hidden>Playoff Bracket</a>
+                <a class="dropdown-item" href="/share.html" data-role="team" hidden>Share Data</a>
+                <h6 class="dropdown-header" data-role="team" hidden>My Team</h6>
+                <a class="dropdown-item" href="/matches.html" data-role="team" hidden>Our Matches</a>
+                <a class="dropdown-item" href="/strategy.html" data-role="team" hidden>Match Strategy</a>
+                <a class="dropdown-item" href="/pitcrew.html" data-role="team" hidden>Pit Crew</a>
+                <a class="dropdown-item" href="/picklist.html" data-role="team" hidden>Pick List</a>
+                <a class="dropdown-item" href="/shifts.html" data-role="team" hidden>Scout Shifts</a>
+                <a class="dropdown-item" href="/team.html" data-role="team" hidden>Team Management</a>
+                <div class="dropdown-divider" data-role="staff" hidden></div>
+                <a class="dropdown-item" href="/portal.html" data-role="staff" hidden>Staff Portal</a>
+              </div>
+            </li>
+
+            <li class="nav-item" id="authNavItem">
+              <a class="nav-link" href="/signin.html">Sign In</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+  <!-- ══════════════════════════════════════════════════════════
+       LOGGED-OUT VIEW  (shown when nobody is signed in)
+  ══════════════════════════════════════════════════════════ -->
+  <div id="loggedOutView">
+
+    <!-- Hero -->
+    <section class="scout-hero">
+      <div class="container hero-inner">
+        <div class="hero-wordmark">
+          <span class="team-num">1307</span>scout
+        </div>
+        <p class="hero-tagline">
+          The scouting platform for competitive robotics. Collect robot data in the pits,
+          collect real-time match data, and share exactly what other teams need to see.
+        </p>
+        <a href="/signin.html" class="hero-cta">Sign in to get started</a>
+        <a href="#get-the-app" class="app-ghost" style="color:#fff;">Get the app</a>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section class="features-section">
+      <div class="container">
+        <h2>Built for competition day</h2>
+        <p class="features-lead">
+          1307scout is designed around how scouting actually happens — fast data entry
+          between matches, instant team lookup at the strategy table, and controlled
+          sharing with alliance partners.
+        </p>
+        <div class="row">
+          <div class="col-lg-3 col-md-6 mb-4">
+            <div class="feature-card">
+              <div class="feature-icon"><i class="fa fa-clipboard"></i></div>
+              <h3>Configurable match forms</h3>
+              <p>Staff define the fields — auto points, climb level, notes, whatever the season needs. The form updates immediately for every scout on the team.</p>
+            </div>
+          </div>
+          <div class="col-lg-3 col-md-6 mb-4">
+            <div class="feature-card">
+              <div class="feature-icon"><i class="fa fa-wifi"></i></div>
+              <h3>Works offline</h3>
+              <p>Match entries are saved when the venue Wi-Fi drops. Drafts are stored on the device and submitted automatically when the connection returns, or handed to a scout who is online by QR code. Install the <a href="#get-the-app">1307scout app</a> and it opens with no connection at all.</p>
+            </div>
+          </div>
+          <div class="col-lg-3 col-md-6 mb-4">
+            <div class="feature-card">
+              <div class="feature-icon"><i class="fa fa-refresh"></i></div>
+              <h3>Official results, synced</h3>
+              <p>Link an event to its FRC or TBA code and 1307scout pulls official match scores automatically — no re-typing results by hand. On competition day, staff can set the current event to refresh every 2 minutes for the day, and anyone on the team can press Resync data to pull the latest results right away. Scouting entries are checked against those results, and any match that needs a second look is flagged. Turn on match alerts and your phone tells you when the team is about to play.</p>
+            </div>
+          </div>
+          <div class="col-lg-3 col-md-6 mb-4">
+            <div class="feature-card">
+              <div class="feature-icon"><i class="fa fa-qrcode"></i></div>
+              <h3>Scoped share codes</h3>
+              <p>Any team member can make a QR code scoped to one team, one event, or both. Set an expiry, hand it to an alliance partner, a parent or a team still waiting to be verified, and revoke it when you're done.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Who it's for: the three access levels -->
+    <section class="tiers-section">
+      <div class="container">
+        <div class="row">
+          <div class="col-12 col-lg-5 mb-4 mb-lg-0">
+            <h2>Who sees what</h2>
+            <p style="color:rgba(255,255,255,.65); font-size:.95rem; max-width:38ch; margin-top:.5rem;">
+              Everyone sees exactly what they need — nothing more.
+            </p>
+          </div>
+          <div class="col-12 col-lg-7">
+            <div class="tier-item">
+              <strong>Site staff</strong>
+              <p>Set up events and form fields, oversee share codes, enter playoff alliances, verify team managers, and review an audit log of who changed what. Access is granted by allowlist.</p>
+            </div>
+            <div class="tier-item">
+              <strong>Team managers</strong>
+              <p>Run their own team on Team Management: verify people who say they're on the team, invite members by email or link, list the school email domain that verifies members at once, make other members managers, choose who can change the team's strategy plans, pick list, pit crew log and scout shifts and who can make share codes, see and revoke every share code the team has made, and set up the pit crew checklist. Site staff confirm a team's first manager with the team before approving them.</p>
+            </div>
+            <div class="tier-item">
+              <strong>Team members</strong>
+              <p>Tell us your team when you sign up. You're verified right away from your school email if your team listed its domain, or by an invitation or join code; otherwise you're a guest until one of its managers verifies you. Scouting data is shared by every team: enter match data and look up any team's history, robot parameters, official results, and letter-grade rating, and make share codes so people who aren't on a team here can see part of it. Your team's strategy plans, pick list, pit crew log and scout shifts are seen only by your team.</p>
+            </div>
+            <div class="tier-item">
+              <strong>Guests</strong>
+              <p>Anyone not on a verified team (yet) can use a share code from a team member to view specific data — a single team's record, or a whole event — without seeing anything else.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Get the app: install 1307scout as an app (PWA). Buttons and data-app-* attributes are run by /js/pwa.js -->
+    <section class="app-section" id="get-the-app">
+      <div class="container">
+        <div class="row">
+          <div class="col-12 col-lg-6 mb-4 mb-lg-0">
+            <h2>Get the 1307scout app</h2>
+            <p class="features-lead">
+              Prefer an app to a browser tab? 1307scout installs on phones, tablets, Chromebooks,
+              and laptops straight from this site. No app store, nothing extra to download, and it's
+              the same 1307scout with the same features and the same account.
+            </p>
+            <ul class="app-points">
+              <li><i class="fa fa-th-large"></i><span>Opens from your home screen, dock, or Start menu in its own window.</span></li>
+              <li><i class="fa fa-plane"></i><span>Opens with no connection. Match entries made offline are kept on the device and sent when you reconnect.</span></li>
+              <li><i class="fa fa-refresh"></i><span>Always up to date. Every update to the website is in the app the next time it opens online.</span></li>
+            </ul>
+            <button type="button" class="hero-cta" data-app-install hidden>Install the app</button>
+            <a href="/app.html" class="app-ghost">Install steps for every device</a>
+          </div>
+          <div class="col-12 col-lg-6">
+            <div class="app-steps">
+              <h3>How to install</h3>
+              <div class="app-step" data-app-device="ios"><strong>iPhone and iPad</strong><span>In Safari, tap Share, then Add to Home Screen.</span></div>
+              <div class="app-step" data-app-device="android"><strong>Android</strong><span>In Chrome, tap Install app, or open the &#8942; menu and choose Install app.</span></div>
+              <div class="app-step" data-app-device="windows mac linux chromebook"><strong>Windows, Mac, Chromebook</strong><span>In Chrome or Edge, click the install icon at the right end of the address bar.</span></div>
+              <div class="app-step" data-app-device="mac"><strong>Mac with Safari</strong><span>Choose File, then Add to Dock.</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Bottom CTA -->
+    <section class="bottom-cta">
+      <div class="container">
+        <h2>Ready to scout?</h2>
+        <p>Team members sign in with their school Google account. Everyone else creates a free account or uses a share code.</p>
+        <a href="/signin.html" class="hero-cta">Sign in</a>
+      </div>
+    </section>
+
+  </div><!-- /loggedOutView -->
+
+
+  <!-- ══════════════════════════════════════════════════════════
+       LOGGED-IN HOME VIEW  (shown when someone is signed in)
+       The script fills in the greeting, badge, and tiles.
+  ══════════════════════════════════════════════════════════ -->
+  <div id="loggedInView">
+    <div class="container">
+      <div class="home-wrap">
+
+        <!-- Greeting: the text node before the span is replaced by the script; the span holds the role badge -->
+        <div class="greeting-bar mt-4">
+          <h2 id="greetingName">Welcome back <span id="greetingBadge"></span></h2>
+          <p id="greetingEmail"></p>
+        </div>
+
+        <!-- Our next match at the default event (team members), from js/schedule.js -->
+        <div id="nextMatch"></div>
+
+        <!-- Primary actions (label + tiles are built by the script, depending on access level) -->
+        <div id="primaryTiles"></div>
+
+        <!-- The app (PWA): an install tile in a browser tab, a status line inside the installed app -->
+        <div class="home-section-label mt-4">App</div>
+        <a href="/app.html" class="nav-tile" data-app-when="browser" hidden>
+          <div class="tile-icon"><i class="fa fa-download"></i></div>
+          <div class="tile-text">
+            <strong>Get the app</strong>
+            <small>Install 1307scout on this device. It opens offline, and keeps match entries until you reconnect.</small>
+          </div>
+          <i class="fa fa-chevron-right tile-chevron"></i>
+        </a>
+        <a href="/app.html" class="nav-tile" data-app-when="installed" hidden>
+          <div class="tile-icon"><i class="fa fa-check"></i></div>
+          <div class="tile-text">
+            <strong>You're using the app</strong>
+            <small>Offline use, updates, and how to remove it</small>
+          </div>
+          <i class="fa fa-chevron-right tile-chevron"></i>
+        </a>
+
+        <!-- Secondary: account -->
+        <div class="home-section-label mt-4">Account</div>
+        <a href="/account.html" class="nav-tile">
+          <div class="tile-icon"><i class="fa fa-user"></i></div>
+          <div class="tile-text">
+            <strong>My account</strong>
+            <small>Change your password, update contact info</small>
+          </div>
+          <i class="fa fa-chevron-right tile-chevron"></i>
+        </a>
+
+        <div class="mt-3">
+          <button class="quick-signout" id="quickSignOut">Sign out</button>
+        </div>
+
+      </div>
+    </div>
+  </div><!-- /loggedInView -->
+
+  <!-- ===== Footer (same on every page) ===== -->
+  <footer class="py-5" id="bottomrow">
+    <a href="https://instagram.com/1307robosaints" class="fa fa-instagram" target="_blank" rel="noopener" aria-label="Instagram"></a>
+    <a href="https://www.youtube.com/@1307Robosaints" class="fa fa-youtube" target="_blank" rel="noopener" aria-label="YouTube"></a>
+    <a href="https://www.facebook.com/1307robosaints" class="fa fa-facebook" target="_blank" rel="noopener" aria-label="Facebook"></a>
+    <a href="https://www.tiktok.com/@1307.robotics" class="fa social-tt" target="_blank" rel="noopener" aria-label="TikTok">
+      <!-- Font Awesome 4.7 has no TikTok logo, so this one is an inline SVG -->
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path fill="currentColor" d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
+      </svg>
+    </a>
+    <div class="container">
+      <p class="m-0 text-center text-white">Copyright &copy; STA Robotics Team 2026</p>
+      <p class="m-0 mt-2 text-center" style="font-size:.78rem;">
+        Website and 1307scout service created and maintained by Daniel Lowry —
+        <a href="/contact.html" style="color:#fff;text-decoration:underline;">website support</a>
+      </p>
+      <p class="m-0 mt-2 text-center" style="font-size:.78rem;">
+        <a href="/privacy-policy.html" style="color:#fff;text-decoration:underline;">Privacy Policy</a>
+        &nbsp;&middot;&nbsp;
+        <a href="/terms-of-service.html" style="color:#fff;text-decoration:underline;">Terms of Service</a>
+      </p>
+    </div>
+  </footer>
+
+  <!-- ===== Scripts ===== -->
+  <script src="/vendor/jquery/jquery.min.js"></script>
+  <script src="/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" integrity="sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o" crossorigin="anonymous"></script>
+  <script src="/js/auth-config.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/pwa.js"></script>
+  <script src="/js/ratings.js"></script>
+  <script src="/js/schedule.js"></script>
+  <script>
+  (async function () {
+    var sb = RS.sb;   // Supabase client created by auth.js
+
+    var session = await RS.session();   // also the login saved on this device when offline
+
+    // ── Not signed in: show the marketing page ───────────────────
+    if (!session) {
+      document.getElementById("loggedOutView").style.display = "block";
+      return;
+    }
+
+    // ── Signed in: work out the access level ─────────────────────
+    // my_access_level() is a database function that returns 'staff', 'student', or 'guest'.
+    var user = session.user;
+    var lvl  = await RS.accessLevel({ offline: true });   // offline: the level last seen on this device
+    if (lvl === null) return;
+    var isStaff = lvl === "staff", isStudent = lvl === "student", isTeam = isStaff || isStudent;
+    // The person's team and role on it (my_team_info(), saved on the device for offline use)
+    var team = (await RS.team()) || { team_number: null };
+    var MY_TEAM = team.team_number, isManager = team.role === "manager";
+
+    // Where an account with no team stands: waiting to be verified, turned down, or not said (team.html)
+    function claimLine(t) {
+      var c = t && t.claim;
+      if (!t || t.team_number) return "";
+      if (!c) return "You haven't said which FRC team you're on. Tell us on Team Management to join your team.";
+      if (c.status === "pending") return "Waiting to be verified on team " + c.team_number + ". Until one of its managers or site staff verifies you, you use 1307scout as a guest.";
+      if (c.status === "denied") return "Team " + c.team_number + " didn't verify you" + (c.note ? ': "' + c.note + '"' : "") + ". See Team Management.";
+      return "";
+    }
+
+    // Greeting: first name if we have one, otherwise a plain welcome.
+    var meta = user.user_metadata || {};
+    var name = meta.display_name || meta.full_name || meta.name || "";
+    var greeting = name ? "Welcome back, " + name.split(" ")[0] + "." : "Welcome back.";
+    // childNodes[0] is the text node before the badge <span>, so the badge itself is left alone
+    document.getElementById("greetingName").childNodes[0].textContent = greeting + " ";
+
+    // Role badge (styles come from .greeting-badge.staff / .student / .guest)
+    var badge = document.getElementById("greetingBadge");
+    badge.textContent = (isStaff ? "Staff" : isManager ? "Team manager" : isStudent ? "Team member" : "Guest") +
+      (MY_TEAM ? " · Team " + MY_TEAM : "");
+    badge.className = "greeting-badge " + (isStaff ? "staff" : isStudent ? "student" : "guest");
+
+    document.getElementById("greetingEmail").textContent = user.email;
+    // Quarantine and other no-team states, under the greeting
+    var line = claimLine(team);
+    if (line) {
+      var note = document.createElement("p");
+      note.className = "claim-status";
+      note.textContent = line + " ";
+      var link = document.createElement("a"); link.href = "/team.html"; link.textContent = "Team Management";
+      note.appendChild(link);
+      document.getElementById("greetingEmail").insertAdjacentElement("afterend", note);
+    }
+
+    // ── Tiles: the menu's two sections, Data (shared by every team) and My Team (your team's own) ──
+    function tile(href, icon, title, desc, cls) {
+      return { href: href, icon: icon, title: title, desc: desc, cls: cls || "" };
+    }
+    var groups = [];
+    if (isTeam) {
+      // Shared by every team: scouting data, official results and the playoffs
+      groups.push({ label: "Data", tiles: [
+        tile("/live.html", "fa-television", "Competition Day", "The livestream beside the match on the field and your next one, plus the bracket in the playoffs. Updates itself"),
+        tile("/query.html", "fa-database", "Team Database", "Match history, robot parameters, official results, event rankings, and ratings"),
+        tile("/alliance.html", "fa-columns", "Alliance View", "Compare red and blue alliances, six robots side by side"),
+        tile("/scout.html", "fa-clipboard", "Scout", "Enter match and pit data for the current event"),
+        tile("/flags.html", "fa-flag", "Match Flags", "Scouting data that may be wrong or missing (checked against official and vision data), and who to scout next"),
+        tile("/playoffs.html", "fa-trophy", "Playoff Selection", "Track alliances as they form and rank the teams still available"),
+        tile("/bracket.html", "fa-sitemap", "Playoff Bracket", "The double-elimination bracket, filled from the alliances and official results"),
+        tile("/share.html", "fa-share-alt", "Share Data", "Make a share code so someone who isn't on a team here can see a team or an event")
+      ] });
+    }
+    if (isTeam && MY_TEAM) {
+      // Your team's own: only its members see these
+      groups.push({ label: "My Team" + (team.name ? ": " + team.name : ""), tiles: [
+        tile("/matches.html", "fa-calendar", "Our Matches", "Every match today, with partners, opponents, and win chance"),
+        tile("/strategy.html", "fa-map-o", "Match Strategy", "Plan each match on the field map, and look back at the plans that worked"),
+        tile("/pitcrew.html", "fa-wrench", "Pit Crew", "The robot's pre-match checklist, batteries, repairs and notes"),
+        tile("/picklist.html", "fa-list-ol", "Pick List", "Your ranked list for alliance selection, with notes and do-not-picks"),
+        tile("/shifts.html", "fa-users", "Scout Shifts", "Who scouts which seat for which matches. The Scout page fills in your next team"),
+        tile("/team.html", "fa-id-badge", "Team Management", isManager
+          ? "Members, join codes, who can change what, and the pit crew checklist"
+          : "Who's on your team, and its managers")
+      ] });
+    }
+    if (!isTeam) {
+      groups.push({ label: "Data access", tiles: [
+        tile("/scout.html", "fa-search", "View shared data", "Enter a share code from a team member"),
+        tile("/team.html", "fa-id-badge", "Join or manage a team", "Join your team with a code from its managers, or ask to manage your team")
+      ] });
+    }
+    groups.push({ label: "More", tiles: [
+      tile("/ratings.html", "fa-question-circle", "How Ratings Work", "How grades, win chance, and the other numbers are worked out")
+    ].concat(isStaff ? [tile("/portal.html", "fa-cog", "Staff Portal", "Events, form fields, share codes, teams, members, and the audit log", "staff-tile")] : []) });
+
+    var area = document.getElementById("primaryTiles");
+    groups.forEach(function (g, i) {
+      var label = document.createElement("div");
+      label.className = "home-section-label" + (i ? " mt-4" : "");
+      label.textContent = g.label;
+      area.appendChild(label);
+      g.tiles.forEach(function (t) {
+        var a = document.createElement("a");
+        a.href = t.href;
+        a.className = "nav-tile " + t.cls;
+        a.innerHTML =
+          '<div class="tile-icon"><i class="fa ' + t.icon + '"></i></div>' +
+          '<div class="tile-text"><strong>' + t.title + '</strong><small>' + t.desc + '</small></div>' +
+          '<i class="fa fa-chevron-right tile-chevron"></i>';
+        area.appendChild(a);
+      });
+    });
+
+    // Sign out, then reload so the logged-out view appears. RS.signOut clears this
+    // device even if the server can't be reached or staff already ended the session.
+    document.getElementById("quickSignOut").addEventListener("click", async function () {
+      await RS.signOut();
+      location.reload();
+    });
+
+    // Last step: reveal the logged-in view (it starts hidden in the CSS)
+    document.getElementById("loggedInView").style.display = "block";
+
+    // The team's next match at the default event: how many matches away, and links to plan it
+    if (MY_TEAM && navigator.onLine !== false) {
+      var evr = await sb.from("events").select("id,name").eq("is_default_event", true).maybeSingle();
+      if (evr.data) {
+        var sched = await RSSchedule.load(sb, evr.data.id);
+        var list = sched.matches, now = list.findIndex(function (m) { return !m.played; });
+        var i = now < 0 ? -1 : list.findIndex(function (m, k) { return k >= now && m.red_teams.concat(m.blue_teams).indexOf(MY_TEAM) !== -1; });
+        if (i >= 0) {
+          var m = list[i], away = i - now, red = m.red_teams.indexOf(MY_TEAM) !== -1;
+          var esc = function (t) { return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;"); };
+          document.getElementById("nextMatch").innerHTML =
+            '<a class="nav-tile mt-3" href="/strategy.html?event=' + encodeURIComponent(evr.data.id) + "&match=" + encodeURIComponent(m.match_key) + '">' +
+            '<div class="tile-icon"><i class="fa fa-flag-checkered"></i></div><div class="tile-text"><strong>Next: ' + esc(RSSchedule.label(m.match_key)) +
+            (away === 0 ? " is up next" : ", " + away + " match" + (away === 1 ? "" : "es") + " away") + "</strong><small>" + (red ? "Red" : "Blue") + " with " +
+            (red ? m.red_teams : m.blue_teams).filter(function (t) { return t !== MY_TEAM; }).join(", ") + " vs " + (red ? m.blue_teams : m.red_teams).join(", ") +
+            " · " + esc(evr.data.name) + " · open the strategy plan</small></div><i class=\"fa fa-chevron-right tile-chevron\"></i></a>";
+        }
+      }
+    }
+  })();
+  </script>
+</body>
+</html>

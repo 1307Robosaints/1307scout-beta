@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>window.RS_BUILD = {"version":"0.0.5+7eca554","channel":"experimental","commit":"7eca554","site":"beta"};</script>
+  <link rel="icon" href="/img/robosaintslogo.png">
+  <!-- 1307scout app (PWA): see /js/pwa.js and /sw.js -->
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#0A2352">
+  <link rel="apple-touch-icon" href="/img/app/apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="1307scout β">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <title>Playoff Selection – 1307scout</title>
+  <!-- Open connections early to the hosts this page needs before it can draw or load data -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="preconnect" href="https://nyanwljgsazwuzmnlrcz.supabase.co" crossorigin>
+  <!-- Light/dark theme, before the stylesheets so a dark page never flashes white -->
+  <script src="/js/theme.js"></script>
+  <link href="/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="/css/modern.css" rel="stylesheet">
+  <style>
+    .p-page { max-width: 1900px; margin: 0 auto; padding: 1.25rem 15px 2rem; }
+    .p-intro { display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .p-intro h1 { font-size: 1.7rem; margin: 0 0 .15rem; }
+    .p-intro h1::after { display: none; }
+    .p-intro p { font-size: .92rem; max-width: none; margin: 0; }
+    .p-event { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+    .p-event label { margin: 0; font-size: .85rem; font-weight: 600; color: var(--muted); }
+    .p-event select { width: auto; max-width: 300px; }
+    .p-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; }
+    .p-layout h2 { font-size: 1.1rem; margin: 0; }
+    .p-layout h2::after { display: none; }
+    .p-panel-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .4rem .75rem; margin-bottom: .5rem; min-height: 31px; }
+    .p-count { color: var(--muted); font-size: .85rem; }
+    .p-size { display: flex; align-items: center; gap: .3rem; margin: 0 0 0 auto; font-size: .82rem; color: var(--muted); cursor: pointer; }
+    .p-size.locked { cursor: default; }
+
+    /* Next-spot bar */
+    .p-next { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; padding: .5rem .6rem; margin-bottom: .5rem; background: var(--tint); border-left: 4px solid var(--blue); }
+    .p-next label { flex: 1 1 10rem; margin: 0; font-size: .9rem; }
+    .p-next label strong { font-family: var(--display); color: var(--heading); }
+    .p-next input { width: 6.5rem; }
+    .p-msg { font-size: .85rem; color: var(--red); min-height: 1.3em; margin-bottom: .25rem; }
+    .p-official { font-size: .8rem; color: var(--muted); margin: 0 0 .3rem; padding: .3rem .5rem; background: var(--tint); border-left: 3px solid var(--blue); }
+
+    /* One card per alliance */
+    .p-alliance { background: var(--white); border: 1px solid var(--line); padding: .4rem .5rem .5rem; margin-bottom: .45rem; }
+    .p-alliance.active { border-color: var(--blue); box-shadow: 0 0 0 1px var(--blue); }
+    .p-alliance-head { display: flex; align-items: center; gap: .5rem; margin-bottom: .3rem; }
+    .p-alliance-head h3 { font-size: .98rem; margin: 0; white-space: nowrap; }
+    .p-total { flex: 1; min-width: 0; color: var(--muted); font-size: .78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .p-view { display: flex; align-items: center; gap: .25rem; color: var(--muted); font-size: .75rem; }
+    .p-view button { min-width: 2.7rem; padding: .08rem .35rem; border: 0; color: #fff; font-size: .75rem; font-weight: 600; cursor: pointer; }
+    .p-view button[data-view="red"] { background: #c0392b; }
+    .p-view button[data-view="blue"] { background: var(--blue); }
+    .p-view button:hover:not(:disabled) { filter: brightness(.88); }
+    .p-view button:disabled { opacity: .35; cursor: not-allowed; }
+
+    .p-slots { display: grid; grid-template-columns: repeat(var(--slots), minmax(0, 1fr)); gap: .3rem; }
+    .p-slot { position: relative; display: block; width: 100%; min-width: 0; min-height: 3.1rem; padding: .15rem .35rem; text-align: left; background: var(--paper); border: 1px solid var(--line); color: var(--ink); line-height: 1.2; }
+    .p-role { display: block; font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+    .p-slot-team { display: block; font-family: var(--display); font-size: 1.05rem; font-weight: 700; color: var(--heading); }
+    .p-slot-name { display: block; font-size: .7rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .p-slot-x { position: absolute; top: 0; right: 0; width: 1.65rem; height: 1.65rem; padding: 0; background: none; border: 0; color: var(--muted); cursor: pointer; }
+    .p-slot-x:hover { color: var(--red); }
+    .p-slot.open { background: none; border-style: dashed; }
+    button.p-slot.open { cursor: pointer; }
+    button.p-slot.open:hover { border-color: var(--blue); }
+    .p-slot.open .p-slot-team { color: var(--line); }
+    .p-slot.target { background: var(--tint); border: 2px solid var(--blue); }
+    .p-slot.target .p-slot-team { color: var(--blue); font-size: .8rem; line-height: 1.6; }
+
+    /* Remaining teams. Headers and the rank and team columns stay put while the table scrolls. */
+    .p-scope .btn { font-size: .78rem; padding: .15rem .55rem; }
+    .p-scroll { overflow: auto; background: var(--white); border: 1px solid var(--line); }
+    .p-table { --group-h: 24px; --rank-w: 40px; --team-w: 205px; width: 100%; border-collapse: separate; border-spacing: 0; font-size: .84rem; font-variant-numeric: tabular-nums; }
+    .p-table th, .p-table td { padding: .3rem .45rem; border-bottom: 1px solid var(--line); white-space: nowrap; text-align: right; background: var(--white); }
+    .p-table thead th { position: sticky; top: var(--group-h); z-index: 2; background: var(--navy); color: #fff; border-bottom: 0; }
+    .p-table thead tr.p-groups th { top: 0; height: var(--group-h); padding: 0 .45rem; font-size: .66rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; text-align: center; border-left: 1px solid rgba(255,255,255,.3); }
+    .p-table tbody tr:hover td { background: var(--tint); }
+    .p-table .p-rank { position: sticky; left: 0; z-index: 1; width: var(--rank-w); min-width: var(--rank-w); text-align: center; color: var(--muted); font-weight: 600; }
+    .p-table .p-team { position: sticky; left: var(--rank-w); z-index: 1; width: var(--team-w); min-width: var(--team-w); max-width: var(--team-w); text-align: left; border-right: 2px solid var(--line); }
+    .p-table thead .p-rank, .p-table thead .p-team { z-index: 3; color: #fff; }
+    .p-table .p-start { border-left: 1px solid var(--line); }
+    .p-table .p-text { text-align: left; }
+    .p-sort { padding: 0; background: none; border: 0; color: inherit; font: inherit; font-weight: 600; cursor: pointer; white-space: nowrap; }
+    .p-sort:hover { text-decoration: underline; }
+    .p-sort .fa { width: .7em; margin-left: .15rem; }
+    .p-team-cell { display: flex; align-items: center; gap: .4rem; }
+    .p-team-cell img { width: 26px; height: 26px; flex: none; object-fit: contain; }
+    .p-team-text { min-width: 0; line-height: 1.2; }
+    .p-team-text strong { display: block; font-family: var(--display); font-size: .95rem; color: var(--heading); }
+    .p-team-text span { display: block; font-size: .72rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+    .p-pick { flex: none; padding: .12rem .45rem; background: var(--blue); border: 0; color: #fff; font-size: .75rem; font-weight: 600; cursor: pointer; }
+    .p-pick:hover:not(:disabled) { background: var(--navy); }
+    .p-pick:disabled { opacity: .4; cursor: not-allowed; }
+    .p-grade { display: inline-block; min-width: 1.5rem; margin-right: .3rem; padding: 0 .2rem; text-align: center; font-family: var(--display); font-weight: 700; }
+    .p-empty, .p-loading { padding: 2rem 1rem !important; color: var(--muted); text-align: center !important; white-space: normal !important; }
+
+    @media (max-width: 575px) { .p-table { --team-w: 150px; } .p-team-cell img { display: none; } }
+    /* Side by side, each panel scrolling on its own, so the board stays in view while picking */
+    @media (min-width: 992px) {
+      .p-layout { grid-template-columns: minmax(400px, 440px) minmax(0, 1fr); align-items: start; }
+      .p-board { position: sticky; top: 84px; max-height: calc(100vh - 94px); overflow-y: auto; padding-right: 2px; }
+      .p-next { position: sticky; top: 0; z-index: 4; }
+      .p-scroll { max-height: calc(100vh - 134px); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ===== Navigation ===== -->
+  <nav class="navbar fixed-top navbar-expand-lg navbar-dark bg-dark" id="navigation">
+    <div class="container">
+      <a class="navbar-brand" href="/index.html">
+        <img src="/img/robosaintslogo.png" data-dark-src="/img/robosaintslogo-dark.png" id="navbarlogo" alt="">
+        St. Thomas Aquinas Robotics Team 1307
+      </a>
+      <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarResponsive"
+              aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <div class="collapse navbar-collapse" id="navbarResponsive">
+        <ul class="navbar-nav ml-auto">
+          <li class="nav-item">
+            <a class="nav-link" href="/index.html">Home</a>
+          </li>
+
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="navSponsors" role="button"
+              data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Sponsors</a>
+            <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navSponsors">
+              <a class="dropdown-item" href="/oursponsors.html">Our Sponsors</a>
+              <a class="dropdown-item" href="/business-plan.html">Business Plan</a>
+            </div>
+          </li>
+
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="navAbout" role="button"
+              data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">About Us</a>
+            <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navAbout">
+              <a class="dropdown-item" href="/about-the-students.html">The Students</a>
+              <a class="dropdown-item" href="/about-the-mentors.html">The Mentors</a>
+              <a class="dropdown-item" href="/about-the-robot.html">The Robots</a>
+              <a class="dropdown-item" href="/results.html">Season Results</a>
+            </div>
+          </li>
+
+          <li class="nav-item">
+            <a class="nav-link" href="/Gallery/gallery.html">Picture Gallery</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/contact.html">Contact Us</a>
+          </li>
+
+          <!-- 1307scout command center. Items marked data-role are shown or hidden by auth.js -->
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="navScout" role="button"
+              data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">1307scout</a>
+            <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navScout">
+              <a class="dropdown-item" href="/1307scout.html">1307scout Home</a>
+              <h6 class="dropdown-header" data-role="team" hidden>Data</h6>
+              <a class="dropdown-item" href="/live.html" data-role="team" hidden>Competition Day</a>
+              <a class="dropdown-item" href="/query.html" data-role="team" hidden>Team Database</a>
+              <a class="dropdown-item" href="/alliance.html" data-role="team" hidden>Alliance View</a>
+              <a class="dropdown-item" href="/scout.html" data-role="team" hidden>Scout</a>
+              <a class="dropdown-item" href="/flags.html" data-role="team" hidden>Match Flags</a>
+              <a class="dropdown-item" href="/playoffs.html" data-role="team" hidden>Playoff Selection</a>
+              <a class="dropdown-item" href="/bracket.html" data-role="team" hidden>Playoff Bracket</a>
+              <a class="dropdown-item" href="/share.html" data-role="team" hidden>Share Data</a>
+              <h6 class="dropdown-header" data-role="team" hidden>My Team</h6>
+              <a class="dropdown-item" href="/matches.html" data-role="team" hidden>Our Matches</a>
+              <a class="dropdown-item" href="/strategy.html" data-role="team" hidden>Match Strategy</a>
+              <a class="dropdown-item" href="/pitcrew.html" data-role="team" hidden>Pit Crew</a>
+              <a class="dropdown-item" href="/picklist.html" data-role="team" hidden>Pick List</a>
+              <a class="dropdown-item" href="/shifts.html" data-role="team" hidden>Scout Shifts</a>
+              <a class="dropdown-item" href="/team.html" data-role="team" hidden>Team Management</a>
+              <div class="dropdown-divider" data-role="staff" hidden></div>
+              <a class="dropdown-item" href="/portal.html" data-role="staff" hidden>Staff Portal</a>
+            </div>
+          </li>
+
+          <li class="nav-item" id="authNavItem">
+            <a class="nav-link" href="/signin.html">Sign In</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="p-page">
+    <div class="p-intro">
+      <div>
+        <h1>Playoff Selection</h1>
+        <p class="text-muted" id="introText">The alliances update on their own as staff enter them. <a href="/ratings.html#playoff-selection">How the ranking works</a></p>
+      </div>
+      <div class="p-event">
+        <label for="eventPick">Event</label>
+        <select id="eventPick" class="custom-select custom-select-sm"></select>
+        <a class="btn btn-outline-primary btn-sm" id="bracketLink" href="/bracket.html">Bracket</a>
+        <a class="btn btn-outline-primary btn-sm" id="pickListLink" href="/picklist.html">Pick List</a>
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="downloadOffline"
+          title="Save a simple pick board for this event that works without a connection"><i class="fa fa-download" aria-hidden="true"></i> Download for offline</button>
+      </div>
+    </div>
+    <div id="loadError"></div>
+
+    <div class="p-layout">
+      <section class="p-board" aria-label="Alliances">
+        <div class="p-panel-head">
+          <h2>Alliances</h2>
+          <label class="p-size" id="sizeLabel" title="4-team alliances add a third round of picks. On by default at district championships and the FIRST Championship.">
+            <input type="checkbox" id="sizeToggle"> 4-team alliances
+          </label>
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="clearAll" hidden>Clear all</button>
+        </div>
+        <form class="p-next" id="addForm" hidden>
+          <label for="addTeam">Next: <strong id="nextLabel"></strong></label>
+          <input type="number" id="addTeam" class="form-control form-control-sm" min="1" max="99999" inputmode="numeric" placeholder="Team #" autocomplete="off">
+          <button type="submit" class="btn btn-primary btn-sm">Add</button>
+        </form>
+        <p class="p-official" id="pickListNote" hidden></p>
+        <p class="p-official" id="officialNote" hidden>These are the official alliances from FRC Events/TBA. They update with every sync, which replaces any change made here.</p>
+        <div class="p-msg" id="boardMsg" role="status"></div>
+        <div id="board"></div>
+      </section>
+
+      <section aria-label="Remaining teams">
+        <div class="p-panel-head">
+          <div><h2>Remaining teams</h2><span class="p-count" id="poolCount"></span></div>
+          <div class="btn-group p-scope" role="group" aria-label="Which matches the stats cover">
+            <button type="button" class="btn btn-primary" data-scope="season">All season</button>
+            <button type="button" class="btn btn-outline-primary" data-scope="event">This event</button>
+          </div>
+        </div>
+        <div class="p-scroll"><table class="p-table" id="poolTable"><tbody><tr><td class="p-loading">Loading…</td></tr></tbody></table></div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="py-5" id="bottomrow">
+    <a href="https://instagram.com/1307robosaints" class="fa fa-instagram" target="_blank" rel="noopener" aria-label="Instagram"></a>
+    <a href="https://www.youtube.com/@1307Robosaints" class="fa fa-youtube" target="_blank" rel="noopener" aria-label="YouTube"></a>
+    <a href="https://www.facebook.com/1307robosaints" class="fa fa-facebook" target="_blank" rel="noopener" aria-label="Facebook"></a>
+    <a href="https://www.tiktok.com/@1307.robotics" class="fa social-tt" target="_blank" rel="noopener" aria-label="TikTok">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path fill="currentColor" d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
+      </svg>
+    </a>
+    <div class="container">
+      <p class="m-0 text-center text-white">Copyright &copy; STA Robotics Team 2026</p>
+      <p class="m-0 mt-2 text-center" style="font-size:.78rem;">
+        Official match data from the
+        <a href="https://frc-events.firstinspires.org/services/API" target="_blank" rel="noopener" style="color:#fff;text-decoration:underline;">FIRST FRC Events API</a>
+        and <a href="https://www.thebluealliance.com" target="_blank" rel="noopener" style="color:#fff;text-decoration:underline;">The Blue Alliance</a>.
+      </p>
+      <p class="m-0 mt-2 text-center" style="font-size:.78rem;">
+        Website and 1307scout service created and maintained by Daniel Lowry —
+        <a href="/contact.html" style="color:#fff;text-decoration:underline;">website support</a>
+      </p>
+      <p class="m-0 mt-2 text-center" style="font-size:.78rem;">
+        <a href="/privacy-policy.html" style="color:#fff;text-decoration:underline;">Privacy Policy</a>
+        &nbsp;&middot;&nbsp;
+        <a href="/terms-of-service.html" style="color:#fff;text-decoration:underline;">Terms of Service</a>
+      </p>
+    </div>
+  </footer>
+
+  <script src="/vendor/jquery/jquery.min.js"></script>
+  <script src="/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" integrity="sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o" crossorigin="anonymous"></script>
+  <script src="/js/auth-config.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/dialog.js"></script>
+  <script src="/js/pwa.js"></script>
+  <script src="/js/resync.js"></script>
+  <script src="/js/teams.js"></script>
+  <script src="/js/ratings.js"></script>
+  <script src="/js/alliance.js"></script>
+  <script src="/js/opr.js"></script>
+  <script src="/js/offline.js"></script>
+  <script>
+  (async function () {
+    var sb = RS.sb;
+    var $ = function (id) { return document.getElementById(id); };
+
+    function esc(s) {
+      return String(s == null ? "" : s)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    }
+
+    // ── Access gate: the whole team can look, only staff can change picks ──
+    // Hiding the controls is just tidiness. The playoff_picks policies do the real enforcing.
+    var s = await RS.session();   // the saved login when offline, so this doesn't bounce to Sign in
+    if (!s) { location.replace("signin.html"); return; }
+    var lvl = await RS.accessLevel();
+    if (lvl === null) return;
+    if (lvl !== "staff" && lvl !== "student") { location.replace("account.html"); return; }
+    var MY_TEAM = ((await RS.team()) || {}).team_number || null;   // the signed-in person's team (js/auth.js)
+    var canEdit = lvl === "staff";
+
+    // ── Grades (js/ratings.js). Test teams never reach this page's list. ──
+    var R = RSRatings, TIERS = R.TIERS;
+    function gradeFor(rows, team) { return R.gradeFor(rows, team, testTeams); }
+
+    // ── Stat helpers (same rules as the Alliance View) ───────────────
+    function num(v) {
+      if (v == null || v === "") return null;
+      var n = Number(v);
+      return isFinite(n) ? n : null;
+    }
+    function mean(vals) {
+      return vals.length ? vals.reduce(function (a, b) { return a + b; }, 0) / vals.length : null;
+    }
+    function avgOf(rows, key) {
+      return mean(rows.map(function (r) { return num(r.data[key]); }).filter(function (v) { return v != null; }));
+    }
+    function shareOf(rows, test) {
+      return rows.length ? rows.filter(test).length / rows.length : null;
+    }
+    function rateOf(key) {
+      return function (t) { return shareOf(t.rows, function (r) { return r.data[key] === true; }); };
+    }
+    // Official per-robot TOWER level in one played match ("L1".."L3", "None"), or null if not reported
+    var LEVELS = { Level1: "L1", Level2: "L2", Level3: "L3", None: "None" };
+    function officialTower(g, kind) {
+      return g.station ? LEVELS[g[kind + g.station]] || null : null;
+    }
+    function towerGames(t, kind) {
+      return t.games.filter(function (g) { return officialTower(g, kind) != null; });
+    }
+    // This event's component OPR for a FUEL count. Breakdown names change every game, so the field is
+    // found by name: a hub count for auto, and for teleop either its own count or total minus auto.
+    function oprField(re) {
+      return eventOpr.fields.find(function (f) { return re.test(f); }) || null;
+    }
+    function fuelOpr(t, part) {
+      var e = eventOpr.teams[t.team];
+      if (!e) return null;
+      var auto = oprField(/hub.*auto.*count/i), tele = oprField(/hub.*tele.*count/i), total = oprField(/hub.*total.*count/i);
+      if (part === "auto") return auto && e.fields[auto] != null ? e.fields[auto] : null;
+      if (tele) return e.fields[tele] != null ? e.fields[tele] : null;
+      return total && auto && e.fields[total] != null && e.fields[auto] != null ? e.fields[total] - e.fields[auto] : null;
+    }
+    function oneDecimal(v) { return v.toFixed(1); }
+    function percent(v) { return Math.round(v * 100) + "%"; }
+    function pitValue(t, key) {
+      var v = t.pit && t.pit.data ? t.pit.data[key] : null;
+      return v == null || v === "" ? null : v;
+    }
+    function yesNo(v) { return v ? "Yes" : "No"; }
+    function pitYesNo(key) {
+      return function (t) {
+        var v = pitValue(t, key);
+        return v == null ? null : v ? 1 : 0;
+      };
+    }
+    function pitText(key) { return function (t) { return pitValue(t, key); }; }
+    function pitNumber(key) { return function (t) { return num(pitValue(t, key)); }; }
+    function climbRows(t) {
+      return t.rows.filter(function (r) { return r.data.teleop_tower != null && r.data.teleop_tower !== ""; });
+    }
+    // Points a robot scored in each match, with double-scouted matches averaged, as in team_ratings().
+    function pointsPerMatch(rows) {
+      var byMatch = {};
+      rows.forEach(function (r, i) {
+        var key = r.match_number == null ? "entry" + i : r.event_id + "|" + r.match_number;
+        var pts = (num(r.data.auto_fuel_hub) || 0) + (num(r.data.teleop_fuel_hub) || 0) +
+          (r.data.auto_tower === "L1" ? 15 : 0) +
+          ({ L1: 10, L2: 20, L3: 30 }[r.data.teleop_tower] || 0);
+        (byMatch[key] = byMatch[key] || []).push(pts);
+      });
+      return Object.keys(byMatch).map(function (k) { return mean(byMatch[k]); });
+    }
+
+    // Columns of the remaining-teams table, in order: official data first, then scouting, then pit.
+    // To change what's shown, edit this list.
+    //   value: the number or text sorted on (null always sorts last)
+    //   show:  the text displayed. lower: true means a smaller number is better.
+    // Ratings cover every event in the season. The other scouted and official columns follow the
+    // All season / This event buttons, and pit columns show the team's newest pit entry.
+    var COLUMNS = [
+      { group: "Ours", key: "pickList", label: "Our list", lower: true, title: "Where this team is on our Pick List (picklist.html). DNP means do not pick.",
+        value: function (t) { return pickList[t.team] ? pickList[t.team].rank : null; },
+        show: function (v, t) { return "#" + v + (pickList[t.team].tier === "dnp" ? " DNP" : ""); } },
+      { group: "Ratings", key: "official", label: "Official", html: true, title: "Official rating: OPR, the points a team adds to its alliance per match, all season. Teams with under 3 qualification matches aren't rated.",
+        value: function (t) { return t.gradeOfficial === "NR" ? null : num(t.official.score); },
+        show: function (v, t) { return gradeHtml(t.gradeOfficial, v); } },
+      { group: "Ratings", key: "scouting", label: "Scouting", html: true, title: "Scouting rating score, all season. Teams with under 3 scouted matches aren't rated.",
+        value: function (t) { return t.gradeScout === "NR" ? null : num(t.scout.score); },
+        show: function (v, t) { return gradeHtml(t.gradeScout, v); } },
+
+      { group: "Official", key: "record", label: "Record", title: "Wins-losses-ties. Sorts by win rate.",
+        value: function (t) { return t.record ? t.record.wins / t.record.matches : null; },
+        show: function (v, t) { return t.record.wins + "-" + t.record.losses + "-" + t.record.ties; } },
+      { group: "Official", key: "allianceScore", label: "Avg score", title: "Average alliance score, which includes its partners", show: oneDecimal,
+        value: function (t) { return t.record ? t.record.avgScore : null; } },
+      { group: "Official", key: "opr", label: "OPR", title: "Estimated points this team adds to its alliance, from this event's qualification matches (see How Ratings Work)", show: oneDecimal,
+        value: function (t) { return eventOpr.teams[t.team] && eventOpr.teams[t.team].score != null ? eventOpr.teams[t.team].score : null; } },
+      { group: "Official", key: "offAutoFuel", label: "Auto FUEL", title: "Estimated FUEL this team scores in AUTO, from this event's official FUEL counts (component OPR, see How Ratings Work)", show: oneDecimal,
+        value: function (t) { return fuelOpr(t, "auto"); } },
+      { group: "Official", key: "offTeleFuel", label: "Teleop FUEL", title: "Estimated FUEL this team scores in teleop, from this event's official FUEL counts (component OPR, see How Ratings Work)", show: oneDecimal,
+        value: function (t) { return fuelOpr(t, "teleop"); } },
+      { group: "Official", key: "offAutoClimb", label: "Auto climb", title: "Share of official matches this robot climbed the TOWER in AUTO (FRC reports this per robot)", show: percent,
+        value: function (t) { return shareOf(towerGames(t, "a"), function (g) { return officialTower(g, "a") !== "None"; }); } },
+      { group: "Official", key: "offClimb", label: "Climb rate", title: "Share of official matches this robot climbed the TOWER in the endgame, with its best level (FRC reports this per robot)",
+        value: function (t) { return shareOf(towerGames(t, "e"), function (g) { return officialTower(g, "e") !== "None"; }); },
+        show: function (v, t) {
+          var best = towerGames(t, "e").map(function (g) { return officialTower(g, "e"); })
+            .filter(function (l) { return l !== "None"; }).sort().pop();
+          return percent(v) + (best ? " (" + best + ")" : "");
+        } },
+
+      { group: "Scouted", key: "matches", label: "Matches", title: "Matches scouted",
+        value: function (t) { return t.perMatch.length; } },
+      { group: "Scouted", key: "points", label: "Avg pts", title: "Average points this robot scored per match", show: oneDecimal,
+        value: function (t) { return mean(t.perMatch); } },
+      { group: "Scouted", key: "autoFuel", label: "Auto FUEL", show: oneDecimal, value: function (t) { return avgOf(t.rows, "auto_fuel_hub"); } },
+      { group: "Scouted", key: "teleFuel", label: "Teleop FUEL", show: oneDecimal, value: function (t) { return avgOf(t.rows, "teleop_fuel_hub"); } },
+      { group: "Scouted", key: "fpv", label: "FUEL / volley", show: oneDecimal, value: function (t) { return avgOf(t.rows, "teleop_fuel_per_volley"); } },
+      { group: "Scouted", key: "accuracy", label: "Accuracy", title: "Scouted shooting accuracy, 1 to 5", show: oneDecimal, value: function (t) { return avgOf(t.rows, "shooter_accuracy"); } },
+      { group: "Scouted", key: "leftZone", label: "Left zone", title: "Share of matches it left the starting zone in auto", show: percent, value: rateOf("auto_mobility") },
+      { group: "Scouted", key: "autoClimb", label: "Auto climb", show: percent,
+        value: function (t) { return shareOf(t.rows, function (r) { return r.data.auto_tower === "L1"; }); } },
+      { group: "Scouted", key: "climb", label: "Climb rate", title: "Share of matches it climbed in teleop, with its best level",
+        value: function (t) { return shareOf(climbRows(t), function (r) { return r.data.teleop_tower !== "None"; }); },
+        show: function (v, t) {
+          var best = climbRows(t).map(function (r) { return r.data.teleop_tower; })
+            .filter(function (l) { return l !== "None"; }).sort().pop();
+          return percent(v) + (best ? " (" + best + ")" : "");
+        } },
+      { group: "Scouted", key: "down", label: "Disabled", title: "Share of matches it was disabled or broke down", lower: true, show: percent,
+        value: function (t) {
+          return shareOf(t.rows, function (r) { return r.data.robot_disabled === true || r.data.broke_down === true; });
+        } },
+      { group: "Scouted", key: "stuck", label: "Stuck", lower: true, show: percent, value: rateOf("stuck_on_field") },
+      { group: "Scouted", key: "fouls", label: "Fouls", title: "Share of matches with a foul or card", lower: true, show: percent, value: rateOf("foul_or_card") },
+
+      { group: "Robot", key: "drivetrain", label: "Drivetrain", text: true, value: pitText("drivetrain") },
+      { group: "Robot", key: "shooter", label: "Shooter", text: true, value: pitText("shooter_type") },
+      { group: "Robot", key: "intake", label: "Intake", text: true, value: pitText("intake_type") },
+      { group: "Robot", key: "capacity", label: "Max FUEL", value: pitNumber("fuel_capacity") },
+      { group: "Robot", key: "range", label: "Range (ft)", value: pitNumber("shooter_max_range_ft") },
+      { group: "Robot", key: "maxClimb", label: "Max climb", show: function (v) { return ["None", "L1", "L2", "L3"][v]; },
+        value: function (t) {
+          var i = ["None", "L1", "L2", "L3"].indexOf(pitValue(t, "tower_max_level"));
+          return i < 0 ? null : i;
+        } },
+      { group: "Robot", key: "trench", label: "TRENCH", title: "Fits under a TRENCH", show: yesNo, value: pitYesNo("trench_capable") },
+      { group: "Robot", key: "vision", label: "Vision", title: "Uses AprilTag vision", show: yesNo, value: pitYesNo("uses_vision") }
+    ];
+    function columnByKey(key) { return COLUMNS.find(function (c) { return c.key === key; }); }
+    function gradeHtml(tier, score) {
+      var c = TIERS[tier];
+      return '<span class="p-grade" style="background:' + c.color + ";color:" + c.ink + ';">' + tier + "</span>" +
+        (score == null ? "" : score.toFixed(1));
+    }
+
+    // ── Page state ───────────────────────────────────────────────────
+    var ALLIANCES = 8;
+    var SLOT_NAMES = ["Captain", "1st pick", "2nd pick", "3rd pick"];
+    var POLL_MS = 15000;
+
+    var events = [], eventId = null;
+    var picks = [];              // rows of playoff_picks for this event
+    var pickList = {};           // our Pick List for this event, by team: { rank, tier }
+    var chosenSpot = null;       // an open spot staff clicked, instead of the next in draft order
+    var saving = false;
+    var shownTarget = "";        // the spot the board last scrolled to
+    var poolTeams = [];          // every team at this event, picked or not
+    var sortKey = "official", sortDir = -1, scope = "season";   // official data first
+
+    var ratings = [], officialRatings = [], testTeams = new Set(), teamInfo = {};
+    var entriesByTeam = {}, pitByTeam = {}, gamesByTeam = {};
+    var eventOpr = { teams: {}, fields: [] };   // js/opr.js, for this event's qualification matches
+
+    // ── Spots on the board ───────────────────────────────────────────
+    function currentEvent() { return events.find(function (e) { return e.id === eventId; }) || null; }
+    // Championship-level events add a third round of picks, so they have a fourth spot. Staff can
+    // switch any event either way (events.alliance_size), as some off-seasons do.
+    function allianceSize() {
+      var ev = currentEvent();
+      if (!ev) return 3;
+      if (ev.alliance_size) return ev.alliance_size;
+      return ev.event_tier === "championship" || ev.event_tier === "district_championship" ? 4 : 3;
+    }
+    function slotCount() {
+      return allianceSize() === 4 || picks.some(function (p) { return p.slot === 4; }) ? 4 : 3;
+    }
+    function pickAt(a, slot) {
+      return picks.find(function (p) { return p.alliance_number === a && p.slot === slot; }) || null;
+    }
+    function picksOf(a) {
+      return picks.filter(function (p) { return p.alliance_number === a; })
+        .sort(function (x, y) { return x.slot - y.slot; });
+    }
+    // The real selection order: each captain and first pick from 1 to 8, then second picks back
+    // from 8 to 1, then any third picks from 1 to 8.
+    function draftOrder() {
+      var order = [], a;
+      for (a = 1; a <= ALLIANCES; a++) order.push([a, 1], [a, 2]);
+      for (a = ALLIANCES; a >= 1; a--) order.push([a, 3]);
+      if (slotCount() === 4) for (a = 1; a <= ALLIANCES; a++) order.push([a, 4]);
+      return order;
+    }
+    // The spot the next team goes into, or null when every spot is full
+    function targetSpot() {
+      if (chosenSpot && !pickAt(chosenSpot[0], chosenSpot[1])) return chosenSpot;
+      chosenSpot = null;
+      return draftOrder().find(function (spot) { return !pickAt(spot[0], spot[1]); }) || null;
+    }
+    function spotLabel(spot) { return "Alliance " + spot[0] + ", " + SLOT_NAMES[spot[1] - 1]; }
+
+    // ── Loading ──────────────────────────────────────────────────────
+    // The API returns at most 1000 rows per request, so page through anything that can grow (js/ratings.js)
+    var pagedRows = R.pagedRows;
+    // Same check as team_ratings(): skips entries from earlier seasons' forms.
+    var SEASON_KEYS = ["stuck_on_field", "foul_or_card", "auto_fuel_hub", "teleop_fuel_hub", "auto_tower", "teleop_tower"];
+    function isThisSeason(r) {
+      return !!r.data && SEASON_KEYS.some(function (k) { return k in r.data; });
+    }
+
+    var picksLoad = 0;
+    async function loadPicks() {
+      var thisLoad = ++picksLoad;
+      var r = await sb.from("playoff_picks").select("alliance_number,slot,team_number,source").eq("event_id", eventId);
+      if (thisLoad !== picksLoad) return;   // a newer load or a save has taken over
+      if (r.error) {
+        console.warn("Playoff Selection:", r.error.message);
+        say("Couldn't refresh the alliances. They may be out of date.");
+        return;
+      }
+      var fresh = r.data || [];
+      var key = function (list) {
+        return JSON.stringify(list.map(function (p) { return [p.alliance_number, p.slot, p.team_number, p.source]; }).sort());
+      };
+      if (key(fresh) === key(picks)) return;
+      picks = fresh;
+      $("officialNote").hidden = !picks.some(function (p) { return p.source === "official"; });
+      render();
+    }
+    // Our Pick List: a column in the table, and the best team on it still available
+    async function loadPickList() {
+      var r = await sb.from("pick_list").select("team_number,rank,tier").eq("event_id", eventId).order("rank");
+      if (r.error) { console.warn("Playoff Selection: pick list:", r.error.message); return; }
+      pickList = {};
+      (r.data || []).forEach(function (p) { pickList[p.team_number] = p; });
+      showPickListNote();
+    }
+    function showPickListNote() {
+      var taken = new Set(picks.map(function (p) { return p.team_number; }));
+      var best = Object.keys(pickList).map(function (k) { return pickList[k]; })
+        .sort(function (a, b) { return a.rank - b.rank; })
+        .find(function (p) { return p.tier !== "dnp" && !taken.has(p.team_number) && p.team_number !== MY_TEAM; });
+      var note = $("pickListNote");
+      note.hidden = !best;
+      if (best) note.innerHTML = "Our list: best available is <strong>" + best.team_number + "</strong> " +
+        esc(RSTeams.name(teamInfo[best.team_number])) + " (#" + best.rank + ")";
+    }
+
+    var eventLoad = 0;
+    async function loadEvent() {
+      var thisLoad = ++eventLoad, id = eventId;
+      $("bracketLink").href = "/bracket.html?event=" + encodeURIComponent(id);
+      $("pickListLink").href = "/picklist.html?event=" + encodeURIComponent(id);
+      pickList = {};
+      loadPickList();
+      picksLoad++;   // ignore any refresh still running for the previous event
+      picks = [];
+      $("officialNote").hidden = true;
+      chosenSpot = null;
+      poolTeams = [];
+      say("");
+      renderBoard();
+      $("poolCount").textContent = "";
+      $("poolTable").innerHTML = '<tbody><tr><td class="p-loading">Loading…</td></tr></tbody>';
+
+      // Who's at this event: anyone on the match schedule, scouted there, or pit scouted there
+      var ranked = R.lists(sb, ["ratings", "official_ratings"]);   // one request for both lists
+      var first = await Promise.all([
+        ranked.then(function (l) { return l.ratings; }),
+        ranked.then(function (l) { return l.official_ratings; }),
+        sb.from("test_teams").select("team_number"),
+        RSTeams.loadInfo(sb),
+        pagedRows(function () {
+          return sb.from("official_match_teams").select("team_number").eq("event_id", id)
+            .order("match_key").order("team_number");
+        }),
+        pagedRows(function () {
+          return sb.from("scouting_entries").select("team_number").eq("event_id", id).order("id");
+        }),
+        sb.from("pit_entries").select("team_number").eq("event_id", id),
+        pagedRows(function () {
+          return sb.from("official_matches_combined").select("match_key,comp_level,red_teams,blue_teams,red_score,blue_score")
+            .eq("event_id", id).eq("comp_level", "qm").order("match_key");
+        })
+      ]);
+      if (thisLoad !== eventLoad) return;   // a different event was chosen while this was loading
+      eventOpr = RSOpr.compute(first[7].data || []);
+
+      ratings = first[0].data || [];
+      officialRatings = first[1].data || [];
+      testTeams = new Set((first[2].data || []).map(function (t) { return t.team_number; }));
+      teamInfo = {};
+      teamInfo = first[3].info || {};
+      var found = new Set();
+      [first[4], first[5], first[6]].forEach(function (r) {
+        (r.data || []).forEach(function (row) { found.add(row.team_number); });
+      });
+      // Test teams hold dummy data, so they never appear in a pick list
+      var teams = Array.from(found).filter(function (t) { return !testTeams.has(t); });
+
+      var second = await Promise.all([
+        teams.length ? pagedRows(function () {
+          return sb.from("scouting_entries").select("team_number,event_id,match_number,data")
+            .in("team_number", teams).order("id");
+        }) : { data: [] },
+        teams.length
+          ? sb.from("pit_entries").select("team_number,data,updated_at").in("team_number", teams)
+              .order("updated_at", { ascending: false })
+          : { data: [] },
+        teams.length ? pagedRows(function () {
+          return sb.rpc("official_match_teams_for", { p_teams: teams })
+            // match_key too: PostgREST only sorts a function result by selected columns. The six
+            // breakdown values are each robot's official TOWER level; station says which is this team's.
+            .select("team_number,event_id,match_key,alliance_score,opponent_score,station," +
+              "a1:breakdown->>autoTowerRobot1,a2:breakdown->>autoTowerRobot2,a3:breakdown->>autoTowerRobot3," +
+              "e1:breakdown->>endGameTowerRobot1,e2:breakdown->>endGameTowerRobot2,e3:breakdown->>endGameTowerRobot3")
+            .order("event_id").order("match_key").order("team_number");
+        }) : { data: [] }
+      ]);
+      if (thisLoad !== eventLoad) return;
+
+      // A failed request would otherwise look like a team with no data.
+      // The warning names what failed and why, so the cause can be reported and fixed.
+      var NAMES = ["scouting ratings", "official ratings", "test teams", "team names", "teams on the schedule",
+        "teams scouted here", "teams pit scouted here", "qualification matches", "scouting entries", "pit entries", "official results"];
+      var failed = first.concat(second).map(function (r, i) { return r.error ? NAMES[i] + ": " + r.error.message : null; }).filter(Boolean);
+      failed.forEach(function (msg) { console.warn("Playoff Selection:", msg); });
+      $("loadError").innerHTML = failed.length
+        ? '<div class="alert alert-warning" role="alert" style="font-size:.9rem;">Some team data couldn\'t be loaded, so this list may be missing teams or stats. Try refreshing the page.' +
+          '<div style="font-size:.8rem;margin-top:.3rem;opacity:.85;">' + failed.map(esc).join("<br>") + "</div></div>"
+        : "";
+
+      entriesByTeam = {};
+      (second[0].data || []).filter(isThisSeason).forEach(function (r) {
+        (entriesByTeam[r.team_number] = entriesByTeam[r.team_number] || []).push(r);
+      });
+      pitByTeam = {};
+      (second[1].data || []).forEach(function (p) {
+        if (!pitByTeam[p.team_number]) pitByTeam[p.team_number] = p;   // newest first
+      });
+      gamesByTeam = {};
+      (second[2].data || []).forEach(function (r) {
+        if (r.alliance_score == null || r.opponent_score == null) return;   // not played yet
+        (gamesByTeam[r.team_number] = gamesByTeam[r.team_number] || []).push(r);
+      });
+      poolTeams = teams;
+      await loadPicks();
+      render();
+      // Names from TBA for any team still without one
+      var named = await RSTeams.fillMissing(sb, teams.concat(picks.map(function (p) { return p.team_number; })), teamInfo);
+      if (named && thisLoad === eventLoad) render();
+    }
+
+    // ── One team's numbers, for the current All season / This event choice ──
+    function recordFor(team, official) {
+      if (scope === "season") {
+        return official ? {
+          wins: official.wins, losses: official.losses, ties: official.ties, matches: official.matches,
+          avgScore: num(official.avg_alliance_score)
+        } : null;
+      }
+      var games = (gamesByTeam[team] || []).filter(function (g) { return g.event_id === eventId; });
+      if (!games.length) return null;
+      var count = function (test) { return games.filter(test).length; };
+      return {
+        wins: count(function (g) { return g.alliance_score > g.opponent_score; }),
+        losses: count(function (g) { return g.alliance_score < g.opponent_score; }),
+        ties: count(function (g) { return g.alliance_score === g.opponent_score; }),
+        matches: games.length,
+        avgScore: mean(games.map(function (g) { return g.alliance_score; }))
+      };
+    }
+    function teamData(team) {
+      var all = entriesByTeam[team] || [];
+      var rows = scope === "season" ? all : all.filter(function (r) { return r.event_id === eventId; });
+      var official = officialRatings.find(function (r) { return r.team_number === team; }) || null;
+      return {
+        team: team,
+        info: teamInfo[team] || {},
+        scout: ratings.find(function (r) { return r.team_number === team; }) || null,
+        official: official,
+        gradeScout: gradeFor(ratings, team),
+        gradeOfficial: gradeFor(officialRatings, team),
+        rows: rows,
+        games: (gamesByTeam[team] || []).filter(function (g) { return scope === "season" || g.event_id === eventId; }),
+        perMatch: pointsPerMatch(rows),
+        record: recordFor(team, official),
+        pit: pitByTeam[team] || null
+      };
+    }
+
+    // ── Sorting ──────────────────────────────────────────────────────
+    function compareValues(a, b, dir) {
+      if (a == null || b == null) return a == null ? (b == null ? 0 : 1) : -1;   // blanks stay last
+      return dir * (typeof a === "string" ? a.localeCompare(b) : a - b);
+    }
+    // Ties fall back to the official rating, then the scouting rating, then team number.
+    // The two ratings are only ever compared one after the other, never combined.
+    function sortedTeams(list) {
+      var col = columnByKey(sortKey), scouting = columnByKey("scouting"), official = columnByKey("official");
+      return list.slice().sort(function (x, y) {
+        return compareValues(col.value(x), col.value(y), sortDir) ||
+          compareValues(official.value(x), official.value(y), -1) ||
+          compareValues(scouting.value(x), scouting.value(y), -1) ||
+          x.team - y.team;
+      });
+    }
+
+    // ── Rendering ────────────────────────────────────────────────────
+    function say(text) { $("boardMsg").textContent = text; }
+
+    function slotHtml(a, slot, target) {
+      var pick = pickAt(a, slot), role = '<span class="p-role">' + SLOT_NAMES[slot - 1] + "</span>";
+      if (pick) {
+        var name = RSTeams.name(teamInfo[pick.team_number]);
+        return '<div class="p-slot"' + (name ? ' title="' + esc(name) + '"' : "") + ">" + role +
+          '<span class="p-slot-team">' + pick.team_number + "</span>" +
+          '<span class="p-slot-name">' + (esc(name) || "&nbsp;") + "</span>" +
+          (canEdit ? '<button type="button" class="p-slot-x" data-remove-a="' + a + '" data-remove-s="' + slot +
+            '" title="Remove team ' + pick.team_number + '" aria-label="Remove team ' + pick.team_number +
+            '"><i class="fa fa-times"></i></button>' : "") +
+        "</div>";
+      }
+      if (!canEdit) return '<div class="p-slot open">' + role + "</div>";
+      var isTarget = target && target[0] === a && target[1] === slot;
+      return '<button type="button" class="p-slot open' + (isTarget ? " target" : "") + '" data-spot-a="' + a +
+        '" data-spot-s="' + slot + '" aria-label="Fill Alliance ' + a + ", " + SLOT_NAMES[slot - 1] + '">' + role +
+        '<span class="p-slot-team">' + (isTarget ? "Next up" : '<i class="fa fa-plus"></i>') + "</span></button>";
+    }
+    // Scouted points are per robot, so they add up. Only the three robots in a match count, and
+    // this always covers the whole season, to agree with the Alliance View.
+    function allianceTotal(list) {
+      var points = list.filter(function (p) { return p.slot <= Alliance.MAX; }).map(function (p) {
+        var r = ratings.find(function (x) { return x.team_number === p.team_number; });
+        return r ? num(r.avg_points) : null;
+      }).filter(function (v) { return v != null; });
+      if (!points.length) return "";
+      return points.reduce(function (a, b) { return a + b; }, 0).toFixed(1) + " scouted pts / match";
+    }
+    function renderBoard() {
+      var target = canEdit ? targetSpot() : null;
+      var slots = slotCount(), html = "";
+      for (var a = 1; a <= ALLIANCES; a++) {
+        var list = picksOf(a), off = list.length ? "" : " disabled";
+        var cells = "";
+        for (var slot = 1; slot <= slots; slot++) cells += slotHtml(a, slot, target);
+        html += '<div class="p-alliance' + (target && target[0] === a ? " active" : "") + '">' +
+          '<div class="p-alliance-head"><h3>Alliance ' + a + "</h3>" +
+            '<span class="p-total">' + allianceTotal(list) + "</span>" +
+            '<span class="p-view">View as' +
+              '<button type="button" data-view="red" data-a="' + a + '"' + off + ' title="Open Alliance ' + a + ' as red in the Alliance View">Red</button>' +
+              '<button type="button" data-view="blue" data-a="' + a + '"' + off + ' title="Open Alliance ' + a + ' as blue in the Alliance View">Blue</button>' +
+            "</span></div>" +
+          '<div class="p-slots" style="--slots:' + slots + ';">' + cells + "</div></div>";
+      }
+      $("board").innerHTML = html;
+      $("sizeToggle").checked = allianceSize() === 4;
+      $("sizeLabel").hidden = !canEdit && allianceSize() !== 4;
+      if (canEdit) {
+        $("nextLabel").textContent = target ? spotLabel(target) : "all spots are filled";
+        $("clearAll").hidden = !picks.length;
+        var spotKey = target ? target.join() : "";
+        if (spotKey !== shownTarget) keepTargetInView();
+        shownTarget = spotKey;
+      }
+    }
+    // On a short screen the board scrolls by itself, so keep the spot being filled in view. Only
+    // the panel moves: scrollIntoView would also move the page, away from the table on a phone.
+    function keepTargetInView() {
+      var panel = document.querySelector(".p-board");
+      var active = $("board").querySelector(".p-alliance.active");
+      if (!active || panel.scrollHeight <= panel.clientHeight) return;
+      var box = active.getBoundingClientRect(), view = panel.getBoundingClientRect();
+      var top = view.top + $("addForm").offsetHeight + 8;   // the Next bar stays pinned over the panel
+      if (box.top < top) panel.scrollTop -= top - box.top;
+      else if (box.bottom > view.bottom) panel.scrollTop += box.bottom - view.bottom + 8;
+    }
+
+    function headHtml() {
+      var groups = "", i = 0;
+      while (i < COLUMNS.length) {
+        var span = COLUMNS.filter(function (c) { return c.group === COLUMNS[i].group; }).length;
+        groups += '<th colspan="' + span + '">' + esc(COLUMNS[i].group) + "</th>";
+        i += span;
+      }
+      var cells = COLUMNS.map(function (c, n) {
+        var active = c.key === sortKey;
+        var arrow = !active ? "" : sortDir > 0 ? "fa-caret-up" : "fa-caret-down";
+        return '<th class="' + cellClass(c, n) + '"' +
+          (active ? ' aria-sort="' + (sortDir > 0 ? "ascending" : "descending") + '"' : "") + ">" +
+          '<button type="button" class="p-sort" data-sort="' + c.key + '"' + (c.title ? ' title="' + esc(c.title) + '"' : "") + ">" +
+          esc(c.label) + '<i class="fa ' + arrow + '"></i></button></th>';
+      }).join("");
+      return '<thead><tr class="p-groups"><th class="p-rank"></th><th class="p-team"></th>' + groups + "</tr>" +
+        '<tr><th class="p-rank">#</th><th class="p-team">Team</th>' + cells + "</tr></thead>";
+    }
+    function cellClass(c, n) {
+      return (c.text ? "p-text" : "") + (n && COLUMNS[n - 1].group !== c.group ? " p-start" : "");
+    }
+    function rowHtml(t, position, target) {
+      var sorted = columnByKey(sortKey).value(t) != null;
+      var pick = canEdit
+        ? '<button type="button" class="p-pick" data-pick="' + t.team + '"' + (target ? ' title="Add to ' + spotLabel(target) + '"' : " disabled") + ">Pick</button>"
+        : "";
+      var cells = COLUMNS.map(function (c, n) {
+        var v = c.value(t);
+        var shown = v == null ? "—" : c.html ? c.show(v, t) : esc(c.show ? c.show(v, t) : v);
+        if (v == null && c.html) shown = gradeHtml("NR", null);
+        return '<td class="' + cellClass(c, n) + '">' + shown + "</td>";
+      }).join("");
+      return "<tr>" +
+        '<td class="p-rank">' + (sorted ? position : "—") + "</td>" +
+        '<td class="p-team"><div class="p-team-cell">' + pick +
+          (RSTeams.logo(t.info) ? '<img src="' + esc(RSTeams.logo(t.info)) + '" alt="">' : "") +
+          '<div class="p-team-text"><strong>' + t.team + "</strong><span>" + esc(RSTeams.name(t.info)) + "</span></div>" +
+        "</div></td>" + cells + "</tr>";
+    }
+    function renderPool() {
+      var taken = new Set(picks.map(function (p) { return p.team_number; }));
+      var left = sortedTeams(poolTeams.filter(function (t) { return !taken.has(t); }).map(teamData));
+      var target = canEdit ? targetSpot() : null;
+      $("poolCount").textContent = poolTeams.length ? " " + left.length + " of " + poolTeams.length + " available" : "";
+      var body = left.length
+        ? left.map(function (t, i) { return rowHtml(t, i + 1, target); }).join("")
+        : '<tr><td class="p-empty" colspan="' + (COLUMNS.length + 2) + '">' +
+          (poolTeams.length ? "Every team at this event is on an alliance."
+            : "No teams found for this event yet. Teams appear here once its schedule syncs or someone scouts them." +
+              (canEdit ? " You can still type team numbers into the alliances." : "")) +
+          "</td></tr>";
+      $("poolTable").innerHTML = headHtml() + "<tbody>" + body + "</tbody>";
+    }
+    function render() { renderBoard(); renderPool(); showPickListNote(); }
+
+    // ── Changing picks ───────────────────────────────────────────────
+    async function placeTeam(team) {
+      if (saving) return false;
+      var spot = targetSpot();
+      if (!spot) { say("Every spot is filled. Remove a team to change one."); return false; }
+      var already = picks.find(function (p) { return p.team_number === team; });
+      if (already) { say("Team " + team + " is already on Alliance " + already.alliance_number + "."); return false; }
+      saving = true;
+      say("");
+      var id = eventId;
+      var row = { alliance_number: spot[0], slot: spot[1], team_number: team };
+      var r = await sb.from("playoff_picks").insert(Object.assign({ event_id: id }, row));
+      saving = false;
+      if (id !== eventId) return false;
+      if (r.error) {
+        say(r.error.code === "23505" ? "Someone else just took that team or spot, so the board was refreshed."
+          : "Couldn't save that pick: " + r.error.message);
+        await loadPicks();
+        return false;
+      }
+      picksLoad++;   // a refresh already in flight could predate this pick
+      picks.push(row);
+      chosenSpot = null;
+      render();
+      return true;
+    }
+    async function removePick(a, slot) {
+      if (saving) return;
+      saving = true;
+      say("");
+      var id = eventId;
+      var r = await sb.from("playoff_picks").delete()
+        .eq("event_id", id).eq("alliance_number", a).eq("slot", slot).select("team_number");
+      saving = false;
+      if (id !== eventId) return;
+      if (r.error || !r.data.length) {
+        say("Couldn't remove that team, so the board was refreshed.");
+        await loadPicks();
+        return;
+      }
+      picksLoad++;
+      picks = picks.filter(function (p) { return !(p.alliance_number === a && p.slot === slot); });
+      render();
+    }
+    async function clearPicks() {
+      if (saving || !(await RSDialog.confirm("Remove every team from all alliances at this event?", { title: "Clear alliances", ok: "Clear", danger: true }))) return;
+      saving = true;
+      say("");
+      var r = await sb.from("playoff_picks").delete().eq("event_id", eventId);
+      saving = false;
+      if (r.error) { say("Couldn't clear the alliances: " + r.error.message); return; }
+      chosenSpot = null;
+      await loadPicks();
+    }
+
+    // ── Controls ─────────────────────────────────────────────────────
+    $("board").addEventListener("click", function (e) {
+      var view = e.target.closest("[data-view]");
+      if (view) {
+        var teams = picksOf(parseInt(view.dataset.a, 10)).map(function (p) { return p.team_number; });
+        Alliance.set(view.dataset.view, teams);   // a fourth team doesn't fit, so the first three go
+        location.href = "/alliance.html";
+        return;
+      }
+      if (!canEdit) return;
+      var x = e.target.closest("[data-remove-a]");
+      if (x) { removePick(parseInt(x.dataset.removeA, 10), parseInt(x.dataset.removeS, 10)); return; }
+      var open = e.target.closest("[data-spot-a]");
+      if (open) {
+        chosenSpot = [parseInt(open.dataset.spotA, 10), parseInt(open.dataset.spotS, 10)];
+        say("");
+        render();
+        $("addTeam").focus();
+      }
+    });
+    $("poolTable").addEventListener("click", function (e) {
+      var pick = e.target.closest("[data-pick]");
+      if (pick) { placeTeam(parseInt(pick.dataset.pick, 10)); return; }
+      var head = e.target.closest("[data-sort]");
+      if (!head) return;
+      var col = columnByKey(head.dataset.sort);
+      if (sortKey === col.key) sortDir = -sortDir;
+      else { sortKey = col.key; sortDir = col.lower || col.text ? 1 : -1; }   // best first
+      renderPool();
+    });
+    $("addForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      var input = $("addTeam"), team = Number(input.value);
+      if (!Number.isInteger(team) || team < 1 || team > 99999) { say("Enter a team number."); return; }
+      if (await placeTeam(team)) input.value = "";
+      input.focus();
+    });
+    $("clearAll").addEventListener("click", clearPicks);
+    $("sizeToggle").addEventListener("change", async function () {
+      var ev = currentEvent(), size = this.checked ? 4 : 3;
+      var r = await sb.from("events").update({ alliance_size: size }).eq("id", ev.id).select("id");
+      if (r.error || !r.data.length) {
+        say("Couldn't change the alliance size" + (r.error ? ": " + r.error.message : "."));
+        this.checked = !this.checked;
+        return;
+      }
+      ev.alliance_size = size;
+      chosenSpot = null;
+      render();
+    });
+    $("eventPick").addEventListener("change", function () {
+      eventId = this.value;
+      loadEvent();
+    });
+    document.querySelector(".p-scope").addEventListener("click", function (e) {
+      var btn = e.target.closest("[data-scope]");
+      if (!btn) return;
+      scope = btn.dataset.scope;
+      this.querySelectorAll("[data-scope]").forEach(function (b) {
+        b.className = "btn " + (b === btn ? "btn-primary" : "btn-outline-primary");
+      });
+      renderPool();
+    });
+
+    // ── Offline pick board (js/offline.js) ───────────────────────────
+    // Every column worked out now, for both All season and This event, so the file needs nothing
+    // else. A cell is [value to sort on, text shown, grade letter for the rating columns].
+    function offlineCell(c, t) {
+      var v = c.value(t);
+      if (c.html) return [v, v == null ? "" : v.toFixed(1), c.key === "official" ? t.gradeOfficial : t.gradeScout];
+      return [v, v == null ? "—" : String(c.show ? c.show(v, t) : v)];
+    }
+    $("downloadOffline").addEventListener("click", function () {
+      var ev = currentEvent();
+      if (!ev) return;
+      RSOffline.fromButton(this, async function () {
+        var shownScope = scope;
+        var all = Array.from(new Set(poolTeams.concat(picks.map(function (p) { return p.team_number; }))));
+        var teams = all.map(function (team) {
+          var row = { team: team, name: RSTeams.name(teamInfo[team]) };
+          ["season", "event"].forEach(function (s) {
+            scope = s;
+            var t = teamData(team);
+            row[s] = COLUMNS.map(function (c) { return offlineCell(c, t); });
+          });
+          return row;
+        });
+        scope = shownScope;
+        RSOffline.board({
+          event: ev.name, saved: new Date().toISOString(), slots: slotCount(), alliances: ALLIANCES,
+          picks: picks.map(function (p) { return [p.alliance_number, p.slot, p.team_number]; }),
+          columns: COLUMNS.map(function (c) {
+            return { key: c.key, label: c.label, group: c.group, title: c.title || "", lower: !!c.lower, text: !!c.text };
+          }),
+          tiers: TIERS, teams: teams
+        }, { file: "playoffs-" + ev.name });
+      });
+    });
+
+    // ── Start ────────────────────────────────────────────────────────
+    if (!canEdit) {
+      $("sizeToggle").disabled = true;
+      $("sizeLabel").classList.add("locked");
+    }
+    if (canEdit) {
+      $("addForm").hidden = false;
+      $("introText").innerHTML = 'Click <strong>Pick</strong> on a team or type its number to fill the highlighted spot. ' +
+        'Click any open spot to fill that one instead. <a href="/ratings.html#playoff-selection">How the ranking works</a>';
+    }
+    var r = await sb.from("events").select("id,name,event_date,event_tier,is_default_event,alliance_size")
+      .order("event_date", { ascending: false, nullsFirst: false });
+    if (r.error) {
+      $("loadError").innerHTML = '<div class="alert alert-warning" role="alert">Couldn\'t load the events. Try refreshing the page.</div>';
+      return;
+    }
+    events = r.data || [];
+    if (!events.length) {
+      $("poolTable").innerHTML = '<tbody><tr><td class="p-empty">No events yet. Staff can add one in the Staff Portal.</td></tr></tbody>';
+      $("addForm").hidden = true;
+      return;
+    }
+    $("eventPick").innerHTML = events.map(function (ev) {
+      return '<option value="' + esc(ev.id) + '">' + esc(ev.name) + (ev.event_date ? " (" + esc(ev.event_date) + ")" : "") + "</option>";
+    }).join("");
+    eventId = (events.find(function (ev) { return ev.is_default_event; }) || events[0]).id;
+    $("eventPick").value = eventId;
+    RSResync.mount(document.querySelector(".p-event"), function () { return loadEvent(); });
+    await loadEvent();
+
+    // Keeps every screen current while alliances form. It's one small query, and re-renders only on a change.
+    setInterval(function () {
+      if (!document.hidden && !saving) { loadPicks(); loadPickList(); }
+    }, POLL_MS);
+  })();
+  </script>
+</body>
+</html>

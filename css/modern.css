@@ -1,0 +1,795 @@
+/* =========================================================================================================
+   Robosaints 1307 – modern.css
+   The site theme. Load AFTER Bootstrap, in the <head> of every page.
+
+   CONTENTS
+     1. Tokens  (1b. Dark theme only redefines them)
+     2. Base (page, links, focus)
+     3. Typography
+     4. Navbar
+     5. Page heading, breadcrumb, divider
+     6. Buttons
+     7. Cards
+     8. Images
+     9. Homepage carousel
+    10. Footer
+    11. Contact page (map, social list)
+    12. Forms, alerts, badges, tables (sign-in, account, scouting pages)
+    13. Motion
+    14. Shared widgets (grade badge, event tier tag, resync button) and placehold.it fallback
+    15. Dark theme: Bootstrap parts the tokens can't reach
+   ========================================================================================================= */
+
+
+/* =========================================================================================================
+   1. TOKENS
+   ========================================================================================================= */
+:root {
+  --navy:   #0A2352;   /* deep team blue: footer, headings, buttons hover */
+  --blue:   #1B4DB1;   /* primary team blue: links, buttons, accents      */
+  --tint:   #E6EEFB;   /* pale blue: hovers, badges, table stripes        */
+  --paper:  #F4F7FC;   /* page background                                 */
+  --white:  #FFFFFF;   /* cards, nav                                      */
+  --line:   #D3DEF0;   /* hairlines and borders                           */
+  --ink:    #0C1A33;   /* body text                                       */
+  --muted:  #5B6B85;   /* secondary text                                  */
+  --heading:#0A2352;   /* headings and strong text (navy; light in dark mode) */
+  --link:   #1B4DB1;   /* link text                                        */
+  --cut:    18px;        /* size of the signature clipped corner            */
+
+  /* Status colors for text and pale backgrounds (good/bad/caution, role chips).
+     Solid fills with white text (grade chips, tier tags) keep their hex values in both themes. */
+  --green:  #1a7f4b;   --green-bg:  #e7f7ee;
+  --red:    #c0392b;   --red-bg:    #fde8e8;
+  --amber:  #a35200;   --amber-bg:  #fff3e0;
+  --purple: #6c3fb5;   --purple-bg: #f3ecff;
+  --grey:   #6c6c6e;   --grey-bg:   #f2f2f2;
+
+  --display: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
+  --body:    "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+}
+
+
+/* =========================================================================================================
+   1b. DARK THEME
+   Chosen on My Account and applied by /js/theme.js as <html data-theme="dark">. Almost everything is drawn
+   from the tokens above, so dark mode is mostly these values. --navy stays a dark plate (footer, table
+   headers, hero bands carry white text in both themes); text that was navy uses --heading instead.
+   Bootstrap's own components are fixed up in section 15.
+   ========================================================================================================= */
+:root[data-theme="dark"] {
+  color-scheme: dark;                /* native scrollbars, date pickers and checkboxes go dark too */
+  --navy:   #0A1A3C;
+  --blue:   #4479E3;
+  --tint:   #1E2C47;
+  --paper:  #0D1424;
+  --white:  #151F33;
+  --line:   #2B3B5A;
+  --ink:    #E2E8F3;
+  --muted:  #9AA9C2;
+  --heading:#DCE7FB;
+  --link:   #7FA6F7;
+
+  --green:  #4FC48B;   --green-bg:  rgba(79,196,139,.16);
+  --red:    #F2766B;   --red-bg:    rgba(242,118,107,.16);
+  --amber:  #F0A84E;   --amber-bg:  rgba(240,168,78,.16);
+  --purple: #B79AF0;   --purple-bg: rgba(183,154,240,.16);
+  --grey:   #A5A9B3;   --grey-bg:   rgba(165,169,179,.14);
+}
+
+
+/* =========================================================================================================
+   2. BASE
+   ========================================================================================================= */
+html { scroll-behavior: smooth; }
+
+body {
+  position: relative;
+  padding-top: 76px;               /* room for the fixed navbar */
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 1rem;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Faint engineering grid that fades out below the page heading */
+body::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 380px;
+  z-index: -1;
+  background-image:
+    linear-gradient(rgba(27,77,177,.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(27,77,177,.07) 1px, transparent 1px);
+  background-size: 32px 32px;
+  -webkit-mask-image: linear-gradient(#000 20%, transparent);
+          mask-image: linear-gradient(#000 20%, transparent);
+  pointer-events: none;
+}
+
+p { max-width: 70ch; }                      /* comfortable reading width */
+.card p, .card-text { max-width: none; }
+@media (max-width: 767px) {
+  p { max-width: none; }                    /* let text use the full phone width instead of wrapping early */
+}
+
+a { color: var(--link); text-decoration: none; }
+a:hover { color: var(--heading); text-decoration: underline; text-underline-offset: 3px; }
+
+:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 2px;
+}
+
+
+/* =========================================================================================================
+   3. TYPOGRAPHY
+   ========================================================================================================= */
+h1, h2, h3, h4, h5, h6,
+.navbar-brand, .btn, .card-header, .auth-tabs button, th {
+  font-family: var(--display);
+}
+h1, h2, h3, h4, h5, h6 { color: var(--heading); font-weight: 600; letter-spacing: -.01em; }
+
+h1 { font-size: clamp(2rem, 4vw, 2.75rem); line-height: 1.1; font-weight: 700; }
+h2 { font-size: 1.75rem; margin-bottom: 1rem; }
+h3 { font-size: 1.4rem; }
+
+h1 small {
+  font-family: var(--body);
+  font-weight: 400;
+  font-size: .5em;
+  color: var(--muted);
+  margin-left: .35em;
+}
+
+/* Short slanted blue bar under every page title */
+h1::after {
+  content: "";
+  display: block;
+  width: 64px;
+  height: 5px;
+  margin-top: .6rem;
+  background: var(--blue);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+}
+
+.text-muted, .card-subtitle { color: var(--muted) !important; }
+
+
+/* =========================================================================================================
+   4. NAVBAR
+   The markup uses Bootstrap's dark navbar, but we restyle it as a white bar, so the "white text" states
+   Bootstrap applies on click/active are overridden back to blue.
+   ========================================================================================================= */
+.navbar.bg-dark {
+  background: rgba(255,255,255,.92) !important;
+  -webkit-backdrop-filter: blur(10px);
+          backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+  padding: .55rem 0;
+}
+
+/* Brand (logo + team name) */
+.navbar-dark .navbar-brand {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  max-width: 80%;                  /* long team name wraps instead of pushing the toggler off-screen */
+  white-space: normal;
+  line-height: 1.2;
+  color: var(--heading);
+  font-weight: 600;
+  font-size: 1.05rem;
+  letter-spacing: .01em;
+}
+.navbar-dark .navbar-brand:hover { color: var(--blue); text-decoration: none; }
+#navbarlogo { height: 38px; width: auto; margin: 0; }
+
+/* Links */
+.navbar-dark .navbar-nav .nav-link {
+  position: relative;
+  padding: .5rem .85rem;
+  color: var(--ink);
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: .95rem;
+  white-space: nowrap;             /* each link stays on one line */
+}
+.navbar-dark .navbar-nav .nav-link:hover,
+.navbar-dark .navbar-nav .nav-link:focus { text-decoration: none; }
+
+/* Hover, focus, pressed, current page, open dropdown: all blue */
+.navbar-dark .navbar-nav .nav-link:hover,
+.navbar-dark .navbar-nav .nav-link:focus,
+.navbar-dark .navbar-nav .nav-link:active,
+.navbar-dark .navbar-nav .nav-link.active,
+.navbar-dark .navbar-nav .nav-link.show,
+.navbar-dark .navbar-nav .show > .nav-link,
+.navbar-dark .navbar-nav .active > .nav-link { color: var(--blue); }
+
+/* Hamburger button (mobile) */
+.navbar-dark .navbar-toggler { border-color: var(--line); }
+.navbar-dark .navbar-toggler-icon {
+  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg viewBox='0 0 30 30' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke='%230A2352' stroke-width='2.5' stroke-linecap='round' d='M4 7h22M4 15h22M4 23h22'/%3E%3C/svg%3E");
+}
+
+/* Dropdown menus */
+.dropdown-menu {
+  margin-top: .5rem;
+  padding: .35rem 0;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  box-shadow: 0 12px 28px rgba(10,35,82,.12);
+}
+.dropdown-item { padding: .5rem 1.1rem; color: var(--ink); font-family: var(--display); font-size: .92rem; }
+.dropdown-item:hover, .dropdown-item:focus { background: var(--tint); color: var(--blue); }
+/* Section labels in the 1307scout menu (Data, My Team) */
+.dropdown-header { padding: .55rem 1.1rem .2rem; color: var(--muted); font-family: var(--display); font-size: .7rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+
+/* Mobile: collapsed menu spacing */
+@media (max-width: 991px) {
+  .navbar-collapse { padding: .5rem 0 1rem; }
+}
+
+/* Desktop: tighter links, smaller brand, and a sliding underline on hover / current page */
+@media (min-width: 992px) {
+  .navbar-dark .navbar-brand { flex: 0 1 auto; max-width: 46%; font-size: .95rem; }
+  .navbar-dark .navbar-nav .nav-link { padding-left: .6rem; padding-right: .6rem; font-size: .92rem; }
+
+  .navbar-dark .navbar-nav .nav-link::after {
+    content: "";
+    position: absolute;
+    left: .6rem; right: .6rem; bottom: .15rem;
+    height: 2px;
+    background: var(--blue);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform .2s ease;
+  }
+  .navbar-dark .navbar-nav .nav-link:hover::after,
+  .navbar-dark .navbar-nav .nav-link:focus::after,
+  .navbar-dark .navbar-nav .nav-link.active::after,
+  .navbar-dark .navbar-nav .nav-link.show::after,
+  .navbar-dark .navbar-nav .show > .nav-link::after { transform: scaleX(1); }
+}
+
+
+/* =========================================================================================================
+   5. PAGE HEADING, BREADCRUMB, DIVIDER
+   ========================================================================================================= */
+.breadcrumb {
+  margin-bottom: 2rem;
+  padding: 0 0 1rem;
+  background: transparent;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  font-size: .85rem;
+}
+.breadcrumb-item + .breadcrumb-item::before { color: var(--muted); }
+.breadcrumb-item.active { color: var(--muted); }
+
+hr { margin: 2.5rem 0; border: 0; border-top: 1px solid var(--line); }
+
+
+/* =========================================================================================================
+   6. BUTTONS  (clipped-corner plates)
+   ========================================================================================================= */
+.btn {
+  padding: .6rem 1.4rem;
+  border: 0;
+  border-radius: 0;
+  font-weight: 600;
+  letter-spacing: .02em;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+  transition: background-color .15s ease, color .15s ease;
+}
+.btn:focus-visible { outline-offset: 3px; }
+
+.btn-primary, .btn-navy { background: var(--blue); color: #fff; }
+.btn-primary:hover, .btn-primary:focus, .btn-primary:active,
+.btn-navy:hover,    .btn-navy:focus,    .btn-navy:active {
+  background: var(--navy) !important;
+  color: #fff;
+  text-decoration: none;
+}
+
+/* Outline buttons need the same two-layer trick as .card (see section 7): a plain border or
+   inset box-shadow gets clipped off wherever .btn's clip-path cuts the corner, leaving the
+   outline open at the diagonal instead of continuing around it. */
+.btn-outline-secondary, .btn-outline-dark {
+  --bc: 10px;                      /* matches .btn's own clip-path corner size */
+  position: relative;
+  isolation: isolate;
+  background: transparent;
+  color: var(--heading);
+  box-shadow: none;
+}
+.btn-outline-secondary::before, .btn-outline-dark::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background: var(--heading);
+  clip-path: polygon(0 0, calc(100% - var(--bc)) 0, 100% var(--bc), 100% 100%, 0 100%);
+  pointer-events: none;
+}
+.btn-outline-secondary::after, .btn-outline-dark::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--white);
+  clip-path: polygon(
+    1.5px 1.5px,
+    calc(100% - var(--bc) - .62px) 1.5px,
+    calc(100% - 1.5px) calc(var(--bc) + .62px),
+    calc(100% - 1.5px) calc(100% - 1.5px),
+    1.5px calc(100% - 1.5px)
+  );
+  pointer-events: none;
+  transition: background-color .15s ease;
+}
+.btn-outline-secondary:hover, .btn-outline-dark:hover { color: #fff; }
+.btn-outline-secondary:hover::after, .btn-outline-dark:hover::after { background: var(--navy); }
+
+
+/* =========================================================================================================
+   7. CARDS  (flat, hairline border, one clipped corner with a complete outline)
+
+   How the outline is drawn: the card itself is transparent and clipped to the cut-corner shape. Two
+   stacked layers sit behind its content:
+     ::before  the full shape in the border color (--line)
+     ::after   the same shape in white, inset 1px, so the border color shows around every edge,
+               including the diagonal.
+   The .41px offsets keep the diagonal rim exactly 1px thick (1px x (sqrt(2) - 1) at 45 degrees).
+   To change the corner size, change --cut in the tokens, or set --c on a single card.
+   ========================================================================================================= */
+.card {
+  --c: var(--cut);                 /* corner size for this card */
+  position: relative;
+  isolation: isolate;              /* keeps the two layers behind the card's own content */
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  clip-path: polygon(0 0, calc(100% - var(--c)) 0, 100% var(--c), 100% 100%, 0 100%);
+}
+
+/* Outer shape in the border color: becomes the 1px outline, diagonal included */
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background: var(--line);
+  clip-path: polygon(0 0, calc(100% - var(--c)) 0, 100% var(--c), 100% 100%, 0 100%);
+  pointer-events: none;
+}
+
+/* Inner white shape, inset 1px */
+.card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--white);
+  clip-path: polygon(
+    1px 1px,
+    calc(100% - var(--c) - .41px) 1px,
+    calc(100% - 1px) calc(var(--c) + .41px),
+    calc(100% - 1px) calc(100% - 1px),
+    1px calc(100% - 1px)
+  );
+  pointer-events: none;
+}
+
+.card-header {
+  padding: 1rem 1.25rem;
+  background: transparent;
+  border-top: 3px solid var(--blue);
+  border-bottom: 1px solid var(--line);
+  color: var(--heading);
+  font-weight: 600;
+  font-size: 1.15rem;
+}
+.card-body { padding: 1.4rem; }
+.card-footer { background: transparent; border-top: 1px solid var(--line); }
+.card-title { margin-bottom: .15rem; font-size: 1.2rem; }
+.card-img-top { border-radius: 0; }
+
+/* Team-leader cards (about-the-students) get the blue top edge too.
+   They have no .card-header, so the bar is painted on the white layer instead of as a real border
+   (a real border would shift the outline layers). */
+.card.text-center::after {
+  background:
+    linear-gradient(var(--blue), var(--blue)) 0 0 / 100% 3px no-repeat,
+    var(--white);
+}
+.card.text-center .card-text { text-align: left; font-size: .95rem; color: #26364f; }
+.card.text-center .card-footer a { font-size: .9rem; word-break: break-all; }
+
+
+/* =========================================================================================================
+   8. IMAGES
+   ========================================================================================================= */
+/* Photos beside text get the clipped corner */
+.row > [class*="col-md-7"] img.img-fluid,
+.row > [class*="col-lg-6"] img.img-fluid.rounded {
+  border-radius: 0 !important;
+  clip-path: polygon(0 0, calc(100% - 24px) 0, 100% 24px, 100% 100%, 0 100%);
+}
+
+#sponsorphoto { width: auto; max-width: 100%; max-height: 140px; object-fit: contain; }
+.img-thumbnail { width: 100%; height: 220px; object-fit: cover; }   /* uniform gallery thumbnails */
+img[src=""] { display: none; }                                       /* hides images with an empty src */
+
+/* Team logo on the homepage: full-width img-fluid is oversized once it stacks under the intro text on phones */
+@media (max-width: 767px) {
+  #logophotomainpage img { max-width: 65%; }
+}
+
+
+/* =========================================================================================================
+   9. HOMEPAGE CAROUSEL
+   ========================================================================================================= */
+.carousel-item {
+  height: 70vh;
+  min-height: 300px;
+  background: no-repeat center center scroll;
+  background-size: cover;
+}
+@media (max-width: 575px) {
+  .carousel-item { height: 45vh; min-height: 220px; }
+}
+header .carousel {
+  border-bottom: 4px solid var(--blue);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 40px), calc(100% - 40px) 100%, 0 100%);   /* signature corner, scaled up */
+}
+.carousel-indicators li { width: 36px; height: 4px; border: 0; background: #fff; opacity: .55; }
+.carousel-indicators li.active { opacity: 1; }
+.carousel-control-prev, .carousel-control-next { width: 8%; }
+.carousel-control-prev-icon, .carousel-control-next-icon {
+  width: 44px; height: 44px;
+  background-color: rgba(10,35,82,.65);
+  background-size: 50% 50%;
+}
+
+
+/* =========================================================================================================
+   10. FOOTER  (same markup on every page: one <a class="fa ..."> per social link)
+   ========================================================================================================= */
+#bottomrow {
+  margin-top: 4rem;
+  background: var(--navy);
+  border-top: 4px solid var(--blue);
+  text-align: center;
+}
+#bottomrow .fa {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px; height: 44px;
+  margin: 0 .35rem 1.25rem;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,.35);
+  border-radius: 0;
+  color: #fff;
+  font-size: 1.15rem;
+  text-decoration: none;
+  transition: background-color .15s ease, border-color .15s ease;
+}
+#bottomrow .fa:hover { background: var(--blue); border-color: var(--blue); }
+#bottomrow .fa svg { display: block; width: 1.1rem; height: 1.1rem; }    /* the TikTok logo (inline SVG) */
+#bottomrow p { max-width: none; font-size: .85rem; color: rgba(255,255,255,.75) !important; }
+
+
+/* =========================================================================================================
+   11. CONTACT PAGE
+   ========================================================================================================= */
+#contactuspage iframe { border: 1px solid var(--line) !important; filter: saturate(.85); }
+
+/* Social list: [icon box] Name, one row per network.
+   Every icon sits in the same fixed-size box, so the logos line up regardless of their own shape. */
+.social-list { margin: 0 0 1.25rem; padding: 0; list-style: none; }
+.social-list li + li { margin-top: .6rem; }
+
+.social-list a {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: .5rem 1rem .5rem .5rem;
+  background: var(--white);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  text-decoration: none;
+  transition: background-color .15s ease, border-color .15s ease;
+}
+.social-list a:hover,
+.social-list a:focus-visible { background: var(--tint); border-color: var(--blue); color: var(--heading); }
+
+.social-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 48px;                  /* icon box size: change this and the width/height below together */
+  width: 48px; height: 48px;
+  background: var(--navy);
+  color: #fff;
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%);
+  transition: background-color .15s ease;
+}
+.social-list a:hover .social-icon,
+.social-list a:focus-visible .social-icon { background: var(--blue); }
+
+.social-icon .fa  { font-size: 1.5rem; line-height: 1; }                  /* Font Awesome logos */
+.social-icon svg  { display: block; width: 1.35rem; height: 1.35rem; }    /* TikTok (inline SVG), sized to match */
+
+.social-name { font-family: var(--display); font-weight: 600; font-size: 1.15rem; }
+
+
+/* =========================================================================================================
+   12. FORMS, ALERTS, BADGES, TABLES  (sign-in, account, and scouting pages)
+   ========================================================================================================= */
+
+/* ----- Sign-in card ----- */
+.auth-wrap { padding: 2rem 1rem; }
+.auth-card {
+  position: relative;
+  padding: 2rem;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--blue);
+  border-radius: 0;
+  box-shadow: none;
+}
+.auth-card h1::after { display: none; }
+.auth-card .sub { color: var(--muted); }
+
+.auth-tabs { display: flex; margin-bottom: 1.25rem; border-bottom: 1px solid var(--line); }
+.auth-tabs button {
+  flex: 1;
+  padding: .7rem;
+  background: none;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  color: var(--muted);
+  font-weight: 600;
+  cursor: pointer;
+}
+.auth-tabs button.active { color: var(--heading); border-bottom-color: var(--blue); }
+
+.auth-link { padding: 0; background: none; border: 0; color: var(--link); font-size: .9rem; }
+.auth-link:hover { color: var(--heading); text-decoration: underline; }
+
+/* ----- Form fields ----- */
+.form-control, .custom-select {
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 0;
+  font-family: var(--body);
+}
+.form-control:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(27,77,177,.18); }
+label { font-size: .88rem; font-weight: 500; color: var(--heading); }
+.custom-control-input:checked ~ .custom-control-label::before { background: var(--blue); border-color: var(--blue); }
+
+/* ----- Alerts and badges ----- */
+.alert { border-radius: 0; border-width: 0 0 0 4px; }
+
+.role-badge {
+  padding: .15rem .55rem;
+  background: var(--tint);
+  color: var(--muted);
+  font-family: var(--display);
+  font-size: .75rem;
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%);
+}
+.role-badge.member { background: var(--blue); color: #fff; }
+
+/* ----- Tables and QR code ----- */
+.scout-table { background: var(--white); font-variant-numeric: tabular-nums; }
+.scout-table th {
+  background: var(--navy);
+  border: 0;
+  color: #fff;
+  font-weight: 500;
+  font-size: .85rem;
+  white-space: nowrap;
+}
+.scout-table td { border-top: 1px solid var(--line); }
+.scout-table tbody tr:nth-child(even) { background: var(--paper); }
+.scout-table tbody tr:hover { background: var(--tint); }
+
+.qr-box { display: inline-block; padding: .75rem; background: #fff; border: 1px solid var(--line); }
+
+
+/* =========================================================================================================
+   13. MOTION  (one small page-load reveal; respects the visitor's reduced-motion setting)
+   ========================================================================================================= */
+@media (prefers-reduced-motion: no-preference) {
+  h1::after { animation: draw .6s .1s ease-out both; transform-origin: left; }
+  @keyframes draw { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { transition: none !important; }
+}
+
+
+/* =========================================================================================================
+   14. SHARED WIDGETS AND PLACEHOLD.IT FALLBACK
+   ========================================================================================================= */
+
+/* Safe to delete once no page uses placehold.it images.
+   Hide the image column when it holds a dead placehold.it image, and let the text use the full width */
+.row > [class*="col-md-7"]:has(img[src*="placehold.it"]) { display: none; }
+.row > [class*="col-md-7"]:has(img[src*="placehold.it"]) + [class*="col-md-5"] { flex: 0 0 100%; max-width: 100%; }
+
+/* Small letter-grade badge (S to F), drawn by RSRatings.gradeBadge() in js/ratings.js */
+.rs-grade {
+  display: inline-block;
+  min-width: 1.45em;
+  padding: 0 .2em;
+  text-align: center;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: .82em;
+  line-height: 1.45;
+}
+
+/* Event level tag (Qualifier, District Champs, Worlds, Off-season), from events.event_tier.
+   Same colors as the Staff Portal's tier badges. */
+.tier-tag {
+  display: inline-block;
+  padding: .05rem .5rem;
+  font-family: var(--display);
+  font-size: .74rem;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--tint);
+  color: var(--blue);
+}
+.tier-tag.district_championship { background: #6c3fb5; color: #fff; }
+.tier-tag.championship          { background: #D4AF37; color: #2b2100; }
+.tier-tag.offseason             { background: #F3E6D3; color: #8A5A22; }
+
+/* "Resync data" button and its status line, drawn by RSResync.mount() in js/resync.js */
+.rs-resync { display: inline-flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.rs-resync-msg { font-size: .78rem; line-height: 1.3; color: var(--muted); }
+.rs-resync-msg.warn { color: var(--red); }
+
+/* Playoff bracket cards, drawn by RSBracket in js/bracket.js (Playoff Bracket and Competition Day).
+   The canvas is laid out at fixed positions, so the page decides how to scroll or scale it. */
+.b-canvas { position: relative; }
+.b-lines { position: absolute; inset: 0; pointer-events: none; }
+.b-lines path { fill: none; stroke: #9fb3d3; stroke-width: 2; }
+.b-round { position: absolute; top: 0; text-align: center; font-size: .72rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.b-section { position: absolute; left: 0; font-family: var(--display); font-size: 1rem; font-weight: 700; color: var(--heading); }
+
+.b-match { position: absolute; display: flex; flex-direction: column; background: var(--white); border: 1px solid var(--line); box-shadow: 0 1px 2px rgba(10,35,82,.08); }
+.b-match.final { border: 2px solid var(--heading); }
+.b-match-head { display: flex; justify-content: space-between; align-items: center; gap: .3rem; height: 20px; padding: 0 .4rem; background: var(--tint); font-size: .68rem; font-weight: 700; color: var(--heading); }
+.b-compare { padding: 0; background: none; border: 0; color: var(--blue); font-size: .68rem; font-weight: 600; cursor: pointer; }
+.b-compare:hover { text-decoration: underline; }
+.b-t { white-space: nowrap; }
+button.b-t { padding: 0; background: none; border: 0; color: inherit; font: inherit; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 2px; }
+button.b-t:hover { color: var(--blue); }
+.b-t.out { text-decoration: line-through; opacity: .5; }
+.b-side { flex: 1; min-height: 26px; display: flex; align-items: center; gap: .3rem; min-width: 0; padding: 0 .4rem 0 .3rem; border-left: 4px solid #c0392b; font-size: .78rem; line-height: 1.15; }
+.b-side.blue { border-left-color: var(--blue); border-top: 1px solid var(--line); }
+.b-seed { flex: none; min-width: 1.5rem; padding: 0 .15rem; background: var(--navy); color: #fff; text-align: center; font-family: var(--display); font-weight: 700; font-size: .74rem; }
+.b-teams { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.b-wait { flex: 1; min-width: 0; color: var(--muted); font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-score { flex: none; font-weight: 600; font-variant-numeric: tabular-nums; }
+.b-side.won { background: var(--green-bg); font-weight: 600; }
+.b-side.won .b-score { color: var(--green); }
+.b-side.lost { color: var(--muted); }
+.b-side.lost .b-seed { background: #9a9a9c; }
+.b-side.ours .b-teams { color: var(--blue); font-weight: 600; }
+.b-flag { padding: .1rem .4rem; background: var(--amber-bg); color: var(--amber); font-size: .66rem; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-flag button { padding: 0 .35rem; background: var(--white); border: 1px solid #d9a441; color: var(--amber); font-size: .66rem; font-weight: 700; cursor: pointer; }
+.b-flag button:hover { background: var(--amber-bg); }
+.b-games { padding: 0 .4rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .68rem; line-height: 1.6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.b-champ { position: absolute; padding: .35rem .5rem; background: var(--navy); color: #fff; text-align: center; }
+.b-champ span { display: block; font-size: .68rem; letter-spacing: .05em; text-transform: uppercase; opacity: .8; }
+.b-champ strong { display: block; font-family: var(--display); font-size: 1rem; }
+.b-champ em { display: block; font-style: normal; font-size: .78rem; }
+
+
+/* =========================================================================================================
+   15. DARK THEME: BOOTSTRAP PARTS
+   Bootstrap 4 hard-codes light colors, so these put its components (and a few rules above that use fixed
+   colors) back on the tokens. Everything here applies only under <html data-theme="dark">.
+   ========================================================================================================= */
+[data-theme="dark"] body::before {
+  background-image:
+    linear-gradient(rgba(127,166,247,.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(127,166,247,.06) 1px, transparent 1px);
+}
+[data-theme="dark"] .navbar.bg-dark { background: rgba(13,20,36,.92) !important; }
+[data-theme="dark"] .navbar-dark .navbar-toggler-icon {
+  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg viewBox='0 0 30 30' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke='%23DCE7FB' stroke-width='2.5' stroke-linecap='round' d='M4 7h22M4 15h22M4 23h22'/%3E%3C/svg%3E");
+}
+[data-theme="dark"] .dropdown-menu { background: var(--white); box-shadow: 0 12px 28px rgba(0,0,0,.45); }
+[data-theme="dark"] .card.text-center .card-text { color: var(--ink); }
+[data-theme="dark"] pre { color: var(--ink); }
+
+/* Tables */
+[data-theme="dark"] .table { color: var(--ink); }
+[data-theme="dark"] .table td, [data-theme="dark"] .table th,
+[data-theme="dark"] .table thead th { border-color: var(--line); }
+
+/* Forms */
+[data-theme="dark"] .form-control, [data-theme="dark"] .custom-select,
+[data-theme="dark"] .form-control:focus { background-color: var(--white); color: var(--ink); }
+[data-theme="dark"] .form-control:disabled, [data-theme="dark"] .form-control[readonly],
+[data-theme="dark"] .custom-select:disabled { background-color: var(--tint); color: var(--muted); }
+[data-theme="dark"] .form-control::placeholder { color: var(--muted); }
+[data-theme="dark"] .custom-select {
+  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%239AA9C2' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right .75rem center;
+  background-size: 8px 10px;
+}
+[data-theme="dark"] .custom-control-label::before { background-color: var(--tint); border: 1px solid var(--line); }
+[data-theme="dark"] .custom-control-input:checked ~ .custom-control-label::before { background-color: var(--blue); border-color: var(--blue); }
+
+/* Modals, close button, pagination */
+[data-theme="dark"] .modal-content { background: var(--white); color: var(--ink); border-color: var(--line); }
+[data-theme="dark"] .modal-header, [data-theme="dark"] .modal-footer { border-color: var(--line); }
+[data-theme="dark"] .close { color: var(--ink); text-shadow: none; }
+[data-theme="dark"] .page-link { background: var(--white); border-color: var(--line); color: var(--link); }
+[data-theme="dark"] .page-item.active .page-link { background: var(--blue); border-color: var(--blue); color: #fff; }
+[data-theme="dark"] .page-item.disabled .page-link { background: var(--white); border-color: var(--line); color: var(--muted); }
+
+/* Alerts: tinted panels with light text instead of pale panels with dark text */
+[data-theme="dark"] .alert-warning { background: var(--amber-bg); border-color: var(--amber); color: #F6D3A4; }
+[data-theme="dark"] .alert-info    { background: rgba(68,121,227,.16); border-color: var(--blue); color: #C4D6FB; }
+[data-theme="dark"] .alert-danger  { background: var(--red-bg); border-color: var(--red); color: #F8C4BE; }
+[data-theme="dark"] .alert-success { background: var(--green-bg); border-color: var(--green); color: #BDEBD3; }
+[data-theme="dark"] .alert a { color: inherit; text-decoration: underline; }
+
+/* Outline button Bootstrap colors itself */
+[data-theme="dark"] .btn-outline-primary { color: var(--link); border-color: var(--blue); }
+[data-theme="dark"] .btn-outline-primary:hover { color: #fff; }
+
+/* Team logos (TBA avatars, staff uploads) are often dark artwork on a transparent background, so they
+   keep a light tile behind them. The team's own logos have dark-theme copies, swapped in by theme.js. */
+[data-theme="dark"] .team-logo, [data-theme="dark"] .team-logo-sm, [data-theme="dark"] .ti-logo,
+[data-theme="dark"] .a-head img, [data-theme="dark"] .p-team-cell img { background-color: #E8EDF5; }
+
+/* ---------------------------------------------------------------------
+   Sortable tables (js/tables.js): click a header to sort, arrows show which way
+--------------------------------------------------------------------- */
+th.rs-sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+th.rs-sortable:hover, th.rs-sortable:focus-visible { color: var(--heading); }
+.rs-arrows { display: inline-flex; flex-direction: column; vertical-align: middle; margin-left: .3rem; line-height: .55; font-size: .5rem; }
+.rs-arrows span { opacity: .3; }
+th.rs-asc .rs-up, th.rs-desc .rs-down { opacity: 1; color: var(--blue); }
+/* On a dark header row (Staff Portal tables) the lit arrow stays readable */
+.scout-table thead th.rs-asc .rs-up, .scout-table thead th.rs-desc .rs-down { color: #fff; }
+/* Search box and filters above a table */
+.rs-tools { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-bottom: .6rem; }
+.rs-tools .rs-search { flex: 1 1 16rem; max-width: 26rem; }
+.rs-tools select { width: auto; max-width: 18rem; }
+.scout-table thead th.rs-sortable:hover, .scout-table thead th.rs-sortable:focus-visible { color: #fff; text-decoration: underline; }
+
+/* ---------------------------------------------------------------------
+   Dialogs (js/dialog.js): the site's confirm / prompt / alert
+--------------------------------------------------------------------- */
+.rs-dialog-back { position: fixed; inset: 0; z-index: 3100; display: flex; align-items: center; justify-content: center;
+                  padding: 16px; background: rgba(10, 20, 40, .55); animation: rs-dialog-fade .12s ease-out; }
+.rs-dialog { width: 100%; max-width: 440px; background: var(--white); color: var(--ink); border: 1px solid var(--line);
+             border-top: 4px solid var(--blue); box-shadow: 0 14px 44px rgba(0, 0, 0, .3); padding: 1.1rem 1.25rem 1rem; }
+.rs-dialog.danger { border-top-color: var(--red); }
+.rs-dialog-title { font-size: 1.1rem; margin: 0 0 .45rem; color: var(--heading); }
+.rs-dialog-title::after { display: none; }
+.rs-dialog-msg { font-size: .9rem; margin: 0 0 .9rem; white-space: pre-line; max-width: none; color: var(--ink); }
+.rs-dialog-input { margin: -.3rem 0 .9rem; }
+.rs-dialog-buttons { display: flex; justify-content: flex-end; gap: .5rem; }
+@keyframes rs-dialog-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .rs-dialog-back { animation: none; } }
